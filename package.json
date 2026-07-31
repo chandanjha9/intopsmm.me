@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "start": "node .output/server/index.mjs",
-    "postinstall": "npm run build",
+    "postinstall": "NITRO_PRESET=node-server npm run build",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
