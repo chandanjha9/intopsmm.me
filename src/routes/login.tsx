@@ -19,7 +19,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/hooks/use-auth";
-import { signInWithFirebaseAndSupabase } from "@/lib/firebaseAuth";
+import { signInWithFirebaseAndSupabase, signInWithFirebaseGoogleAndSupabase } from "@/lib/firebaseAuth";
 
 const credentialsSchema = z.object({
   email: z.string().trim().email({ message: "Enter a valid email address" }).max(255),
@@ -33,7 +33,7 @@ function safePath(value: unknown): string {
 }
 
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
   }),
   head: () => ({
@@ -112,16 +112,15 @@ function LoginPage() {
     if (typeof window !== "undefined") {
       window.sessionStorage.setItem("gp_post_login", destination);
     }
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
+    try {
+      await signInWithFirebaseGoogleAndSupabase();
+      toast.success("Welcome back!");
+      navigate({ to: destination, replace: true });
+    } catch (err: any) {
+      setError(err?.message ?? "Google sign-in failed. Please try again.");
+    } finally {
       setGoogleLoading(false);
-      setError(result.error.message ?? "Google sign-in failed. Please try again.");
-      return;
     }
-    if (result.redirected) return;
-    navigate({ to: destination, replace: true });
   };
 
   const handleForgotPassword = async () => {

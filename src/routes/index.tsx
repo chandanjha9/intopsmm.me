@@ -242,36 +242,7 @@ function Hero() {
         </div>
       </div>
 
-      {/* Inline login box */}
-      <Card className="glass mx-auto mt-12 max-w-4xl border-border/60 p-5 shadow-card">
-        <form
-          className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-          onSubmit={(e) => e.preventDefault()}
-        >
-          <Input aria-label="Username" placeholder="Username" className="h-12 rounded-xl" />
-          <div className="relative">
-            <Input
-              aria-label="Password"
-              type="password"
-              placeholder="Password"
-              className="h-12 rounded-xl pr-16"
-            />
-            <Link
-              to="/login"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary hover:underline"
-            >
-              Reset
-            </Link>
-          </div>
-          <Button asChild variant="hero" size="lg" className="h-12">
-            <Link to="/login">Sign in</Link>
-          </Button>
-        </form>
-        <label className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-          <input type="checkbox" defaultChecked className="h-4 w-4 accent-[hsl(var(--primary))]" />
-          Remember me on this device
-        </label>
-      </Card>
+
     </section>
   );
 }

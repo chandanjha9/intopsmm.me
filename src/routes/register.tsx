@@ -21,6 +21,7 @@ import { BrandingPane, GoogleMark } from "./login";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/hooks/use-auth";
+import { signInWithFirebaseGoogleAndSupabase } from "@/lib/firebaseAuth";
 
 const signUpSchema = z.object({
   username: z
@@ -78,16 +79,14 @@ function RegisterPage() {
   const handleGoogle = async () => {
     setError(null);
     setGoogleLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
+    try {
+      await signInWithFirebaseGoogleAndSupabase();
+      navigate({ to: "/dashboard", replace: true });
+    } catch (err: any) {
+      setError(err?.message ?? "Google sign-up failed. Please try again.");
+    } finally {
       setGoogleLoading(false);
-      setError(result.error.message ?? "Google sign-up failed. Please try again.");
-      return;
     }
-    if (result.redirected) return;
-    navigate({ to: "/dashboard", replace: true });
   };
 
   const handleSignUp = async () => {

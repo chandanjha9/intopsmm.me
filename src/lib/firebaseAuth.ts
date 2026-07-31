@@ -29,3 +29,34 @@ export async function signInWithFirebaseAndSupabase(email: string, password: str
   // Return the Supabase session for any further handling if needed
   return data.session;
 }
+
+/**
+ * Sign in using Firebase Google Auth and then obtain a Supabase session
+ * using the ID token.
+ */
+export async function signInWithFirebaseGoogleAndSupabase() {
+  const { GoogleAuthProvider, signInWithPopup } = await import("firebase/auth");
+  const provider = new GoogleAuthProvider();
+  const result = await signInWithPopup(firebaseAuth, provider);
+  
+  // Get the Google ID token from Firebase
+  const credential = GoogleAuthProvider.credentialFromResult(result);
+  const idToken = credential?.idToken;
+  
+  if (!idToken) {
+    throw new Error("Could not retrieve Google ID token from Firebase");
+  }
+
+  // Pass the ID token to Supabase
+  const { data, error } = await supabase.auth.signInWithIdToken({
+    provider: "google",
+    token: idToken,
+  });
+
+  if (error) {
+    await firebaseAuth.signOut();
+    throw error;
+  }
+
+  return data.session;
+}
