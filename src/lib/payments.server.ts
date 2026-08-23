@@ -98,14 +98,14 @@ export async function submitUtrForVerification(
     throw new Error("This UTR / Transaction ID has already been used and credited.");
   }
 
-  // Fetch payment order and user email
+  // Fetch payment order and user email from users table
   const orderRes = await db
     .request()
     .input("id", sql.UniqueIdentifier, params.paymentOrderId)
     .query(`
       SELECT p.id, p.user_id, p.amount, p.gateway_order_id, p.status, u.email
       FROM payment_orders p
-      INNER JOIN profiles u ON p.user_id = u.id
+      INNER JOIN users u ON p.user_id = u.id
       WHERE p.id = @id
     `);
 
@@ -129,7 +129,7 @@ export async function submitUtrForVerification(
   sendTelegramPaymentAlert({
     paymentOrderId: params.paymentOrderId,
     orderRef: record.gateway_order_id,
-    userEmail: record.email,
+    userEmail: record.email || "User",
     amount: Number(record.amount),
     utrNumber: cleanUtr,
   }).catch((err) => console.error("[telegram] Alert error:", err));

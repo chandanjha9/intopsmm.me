@@ -83,7 +83,7 @@ export async function handleTelegramWebhook(update: any) {
         .query(`
           SELECT p.id, p.amount, p.status, p.gateway_order_id, p.gateway_payment_id, u.email 
           FROM payment_orders p
-          INNER JOIN profiles u ON p.user_id = u.id
+          INNER JOIN users u ON p.user_id = u.id
           WHERE p.id = @id
         `);
 
@@ -143,7 +143,7 @@ export async function handleTelegramWebhook(update: any) {
         .query(`
           SELECT p.id, p.amount, p.status, p.gateway_order_id, p.gateway_payment_id, u.email 
           FROM payment_orders p
-          INNER JOIN profiles u ON p.user_id = u.id
+          INNER JOIN users u ON p.user_id = u.id
           WHERE p.id = @id
         `);
 
