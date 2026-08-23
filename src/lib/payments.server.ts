@@ -38,19 +38,21 @@ export type TopupSession = {
   amount: number;
   keyId: string;
   qrDataUrl: string;
+  shortUrl: string;
   upiIntentUrl?: string;
   expiresAt: number; // timestamp in ms (5 minutes)
 };
 
-/** Creates a Razorpay order, dynamic QR code with 5-minute expiry, and records it in SQL Server */
+/** Creates an official Razorpay payment order + payment link, generates dynamic 5-min QR, and records in SQL Server */
 export async function createTopupSession(userId: string, amount: number): Promise<TopupSession> {
   const { keyId } = credentials();
   const db = await poolConnect;
 
   const receipt = `w_${Date.now()}_${userId.slice(0, 6)}`;
   const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
+  const expireByUnix = Math.floor(expiresAt / 1000);
 
-  // 1. Create standard Razorpay Order
+  // 1. Create official Razorpay Order
   const order = await razorpayFetch("/orders", {
     method: "POST",
     body: JSON.stringify({
@@ -63,12 +65,44 @@ export async function createTopupSession(userId: string, amount: number): Promis
 
   const gatewayOrderId = String(order.id);
 
-  // 2. Generate valid UPI QR Code compatible with PhonePe, GPay, Paytm, BHIM
-  const vpa = process.env.UPI_VPA || "chandanjha45@ybl";
-  const name = process.env.UPI_NAME || "GrowMeSMM";
-  const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(name)}&am=${amount.toFixed(2)}&cu=INR&tr=${gatewayOrderId}&tn=${encodeURIComponent(`Wallet Topup ${amount}`)}`;
-  
-  const qrDataUrl = await QRCode.toDataURL(upiIntentUrl, {
+  // 2. Create official Razorpay Payment Link (routes directly to Razorpay's merchant account)
+  let shortUrl = "";
+  let paymentLinkId = "";
+
+  try {
+    const plink = await razorpayFetch("/payment_links", {
+      method: "POST",
+      body: JSON.stringify({
+        amount: Math.round(amount * 100),
+        currency: "INR",
+        accept_partial: false,
+        description: `GrowMeSMM Wallet Top-Up ₹${amount}`,
+        customer: {
+          name: "Customer",
+          email: "user@growmesmm.in",
+        },
+        notify: { sms: false, email: false },
+        reminder_enable: false,
+        expire_by: expireByUnix,
+        notes: { user_id: userId, gateway_order_id: gatewayOrderId, purpose: "wallet_topup" },
+        callback_url: "https://intopsmm-me.onrender.com/dashboard/add-funds",
+        callback_method: "get",
+      }),
+    });
+
+    if (plink && plink.short_url) {
+      shortUrl = plink.short_url;
+      paymentLinkId = plink.id;
+    }
+  } catch (linkErr) {
+    console.warn("[razorpay] payment_links fallback:", linkErr);
+  }
+
+  // Target URL for the QR code: Razorpay's official hosted link
+  const targetUrl = shortUrl || `https://api.razorpay.com/v1/checkout/embedded?order_id=${gatewayOrderId}`;
+
+  // 3. Generate High-Resolution QR Code of the official Razorpay payment endpoint
+  const qrDataUrl = await QRCode.toDataURL(targetUrl, {
     errorCorrectionLevel: "H",
     margin: 2,
     width: 400,
@@ -78,19 +112,20 @@ export async function createTopupSession(userId: string, amount: number): Promis
     },
   });
 
-  // 3. Record in database
+  // 4. Record in database (storing both gatewayOrderId and paymentLinkId)
   const result = await db
     .request()
     .input("userId", sql.UniqueIdentifier, userId)
     .input("gateway", sql.NVarChar, "razorpay")
     .input("gatewayOrderId", sql.NVarChar, gatewayOrderId)
+    .input("gatewayPaymentId", sql.NVarChar, paymentLinkId || "")
     .input("amount", sql.Decimal(18, 4), amount)
     .input("currency", sql.NVarChar, "INR")
     .input("status", sql.NVarChar, "created")
     .query(`
-      INSERT INTO payment_orders (user_id, gateway, gateway_order_id, amount, currency, status)
+      INSERT INTO payment_orders (user_id, gateway, gateway_order_id, gateway_payment_id, amount, currency, status)
       OUTPUT INSERTED.id
-      VALUES (@userId, @gateway, @gatewayOrderId, @amount, @currency, @status)
+      VALUES (@userId, @gateway, @gatewayOrderId, @gatewayPaymentId, @amount, @currency, @status)
     `);
 
   const paymentOrderId = result.recordset[0]?.id;
@@ -101,7 +136,8 @@ export async function createTopupSession(userId: string, amount: number): Promis
     amount,
     keyId,
     qrDataUrl,
-    upiIntentUrl,
+    shortUrl: targetUrl,
+    upiIntentUrl: targetUrl,
     expiresAt,
   };
 }
@@ -165,9 +201,10 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string |
           notes?: Record<string, string>;
         };
       };
-      qr_code?: {
+      payment_link?: {
         entity?: {
           id?: string;
+          amount?: number;
           notes?: Record<string, string>;
         };
       };
@@ -183,47 +220,63 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string |
 
   const db = await poolConnect;
 
-  // Handle QR Code credited event
-  if (event.event === "qr_code.credited") {
-    const qrEntity = event.payload?.qr_code?.entity;
-    const payment = event.payload?.payment?.entity;
-    const orderId = qrEntity?.notes?.gateway_order_id || payment?.order_id;
-    const amount = Number(payment?.amount ?? 0) / 100;
+  // Handle Payment Link Paid or Payment Captured or Order Paid
+  const payment = event.payload?.payment?.entity;
+  const plink = event.payload?.payment_link?.entity;
+  const order = event.payload?.order?.entity;
 
-    if (orderId && amount > 0) {
-      try {
+  const targetOrderId =
+    payment?.order_id ||
+    plink?.notes?.gateway_order_id ||
+    order?.id ||
+    "";
+
+  const targetPaymentLinkId = plink?.id || "";
+
+  if (
+    event.event === "payment_link.paid" ||
+    event.event === "payment.captured" ||
+    event.event === "order.paid"
+  ) {
+    try {
+      const amount = Number(payment?.amount ?? plink?.amount ?? order?.amount ?? 0) / 100;
+      const paymentId = payment?.id ?? targetPaymentLinkId ?? "";
+
+      // Try by gatewayOrderId first
+      if (targetOrderId && amount > 0) {
         await db
           .request()
           .input("gateway", sql.NVarChar, "razorpay")
-          .input("gatewayOrderId", sql.NVarChar, orderId)
-          .input("gatewayPaymentId", sql.NVarChar, payment?.id ?? qrEntity?.id ?? "")
+          .input("gatewayOrderId", sql.NVarChar, targetOrderId)
+          .input("gatewayPaymentId", sql.NVarChar, paymentId)
           .input("amount", sql.Decimal(18, 4), amount)
           .output("success", sql.Bit)
           .execute("sp_credit_wallet_from_payment");
 
         return new Response("ok");
-      } catch (err: unknown) {
-        console.error("[razorpay] qr_code credit failed:", err);
       }
-    }
-  }
 
-  // Handle standard payment captured or order paid
-  const payment = event.payload?.payment?.entity;
-  const order = event.payload?.order?.entity;
-  const targetOrderId = payment?.order_id || order?.id;
+      // If matched by payment link ID
+      if (targetPaymentLinkId && amount > 0) {
+        // Look up payment_orders row by gateway_payment_id
+        const row = await db
+          .request()
+          .input("gatewayPaymentId", sql.NVarChar, targetPaymentLinkId)
+          .query("SELECT gateway_order_id FROM payment_orders WHERE gateway_payment_id = @gatewayPaymentId");
 
-  if (targetOrderId && (event.event === "payment.captured" || event.event === "order.paid")) {
-    try {
-      const amount = Number(payment?.amount ?? order?.amount ?? 0) / 100;
-      await db
-        .request()
-        .input("gateway", sql.NVarChar, "razorpay")
-        .input("gatewayOrderId", sql.NVarChar, targetOrderId)
-        .input("gatewayPaymentId", sql.NVarChar, payment?.id ?? "")
-        .input("amount", sql.Decimal(18, 4), amount)
-        .output("success", sql.Bit)
-        .execute("sp_credit_wallet_from_payment");
+        const foundOrderId = row.recordset[0]?.gateway_order_id;
+        if (foundOrderId) {
+          await db
+            .request()
+            .input("gateway", sql.NVarChar, "razorpay")
+            .input("gatewayOrderId", sql.NVarChar, foundOrderId)
+            .input("gatewayPaymentId", sql.NVarChar, paymentId)
+            .input("amount", sql.Decimal(18, 4), amount)
+            .output("success", sql.Bit)
+            .execute("sp_credit_wallet_from_payment");
+          return new Response("ok");
+        }
+      }
 
       return new Response("ok");
     } catch (err: unknown) {
@@ -233,12 +286,13 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string |
     }
   }
 
-  if (event.event === "payment.failed" && payment?.order_id) {
+  if (event.event === "payment.failed" && (payment?.order_id || targetOrderId)) {
+    const orderId = payment?.order_id || targetOrderId;
     await db
       .request()
       .input("gateway", sql.NVarChar, "razorpay")
-      .input("gatewayOrderId", sql.NVarChar, payment.order_id)
-      .input("errorMessage", sql.NVarChar, payment.error_description ?? "Payment failed")
+      .input("gatewayOrderId", sql.NVarChar, orderId)
+      .input("errorMessage", sql.NVarChar, payment?.error_description ?? "Payment failed")
       .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
       .query(`
         UPDATE payment_orders 
