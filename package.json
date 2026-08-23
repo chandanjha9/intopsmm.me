@@ -12,7 +12,7 @@
     "migrate:sql": "node src/db/migrate.mjs",
     "seed:admin": "node src/db/seed-admin.mjs",
     "test:db": "node src/db/test-connection.mjs",
-    "postinstall": "NITRO_PRESET=node-server npm run build",
+    "postinstall": "echo postinstall disabled",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
