@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -19,6 +19,9 @@ import {
   User,
   BadgeCheck,
   Globe2,
+  Search,
+  Check,
+  X,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuth } from "@/hooks/use-auth";
@@ -472,40 +475,121 @@ function SelectPill({
   value,
   onChange,
   options,
+  placeholder = "Select an option",
 }: {
   value: string;
   onChange: (v: string) => void;
   options: string[];
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return options;
+    const q = search.toLowerCase();
+    return options.filter((opt) => opt.toLowerCase().includes(q));
+  }, [options, search]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
   return (
-    <div className="relative">
+    <div className="relative w-full" ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex h-11 w-full items-center gap-2 rounded-xl border border-border/60 bg-background px-3 text-left text-sm hover:border-primary/40"
+        onClick={() => {
+          setOpen((o) => !o);
+          setSearch("");
+        }}
+        className="flex min-h-12 w-full items-center justify-between gap-2 rounded-xl border border-border/60 bg-background px-3.5 py-2.5 text-left text-sm hover:border-primary/50 transition focus:outline-none focus:ring-2 focus:ring-primary/20"
       >
-        <span className="truncate">{value}</span>
-        <ChevronDown className={`ml-auto h-4 w-4 shrink-0 text-muted-foreground transition ${open ? "rotate-180" : ""}`} />
+        <span className="line-clamp-2 text-xs sm:text-sm font-medium leading-relaxed text-foreground break-words">
+          {value || placeholder}
+        </span>
+        <ChevronDown
+          className={`ml-2 h-4 w-4 shrink-0 text-muted-foreground transition duration-200 ${
+            open ? "rotate-180 text-primary" : ""
+          }`}
+        />
       </button>
+
       {open && (
-        <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-border/60 bg-popover shadow-lg">
-          {options.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => {
-                onChange(opt);
-                setOpen(false);
-              }}
-              className={`flex w-full items-center px-3 py-2.5 text-left text-sm hover:bg-secondary ${
-                opt === value ? "bg-secondary font-medium" : ""
-              }`}
-            >
-              <span className="truncate">{opt}</span>
-            </button>
-          ))}
-        </div>
+        <>
+          {/* Backdrop on mobile */}
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm sm:hidden"
+            onClick={() => setOpen(false)}
+          />
+
+          <div className="fixed inset-x-3 bottom-6 top-auto z-50 flex max-h-[75vh] flex-col rounded-2xl border border-border/80 bg-popover p-2.5 shadow-2xl sm:absolute sm:inset-x-0 sm:bottom-auto sm:top-full sm:mt-2 sm:max-h-80 sm:rounded-xl">
+            {/* Search Input */}
+            {options.length > 5 && (
+              <div className="relative mb-2 shrink-0">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search service..."
+                  className="h-10 w-full rounded-lg border border-border/60 bg-secondary/60 pl-9 pr-8 text-xs sm:text-sm focus:border-primary focus:bg-background focus:outline-none"
+                  autoFocus
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Options list */}
+            <div className="overflow-y-auto overscroll-contain flex-1 divide-y divide-border/30 rounded-lg">
+              {filtered.length === 0 ? (
+                <div className="p-4 text-center text-xs text-muted-foreground">
+                  No matching services found
+                </div>
+              ) : (
+                filtered.map((opt) => {
+                  const isSelected = opt === value;
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => {
+                        onChange(opt);
+                        setOpen(false);
+                      }}
+                      className={`flex w-full items-start gap-2.5 p-3 text-left transition ${
+                        isSelected
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "text-foreground hover:bg-secondary/70 active:bg-secondary"
+                      }`}
+                    >
+                      <span className="flex-1 text-xs sm:text-sm leading-relaxed whitespace-normal break-words">
+                        {opt}
+                      </span>
+                      {isSelected && <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
