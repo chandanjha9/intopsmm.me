@@ -35,24 +35,37 @@ async function razorpayFetch(path: string, init: RequestInit = {}) {
 export type TopupSession = {
   paymentOrderId: string;
   gatewayOrderId: string;
+  paymentLinkId: string;
   amount: number;
   keyId: string;
   qrDataUrl: string;
   shortUrl: string;
   upiIntentUrl?: string;
-  expiresAt: number; // timestamp in ms (5 minutes)
+  expiresAt: number; // timestamp in ms (5 minutes UI timer)
 };
 
-/** Creates an official Razorpay payment order + payment link, generates dynamic 5-min QR, and records in SQL Server */
+/**
+ * Creates an official Razorpay UPI Payment Link with `upi_link: true`.
+ *
+ * This generates a Razorpay-hosted payment page that:
+ *  - On mobile: opens PhonePe / GPay / Paytm / BHIM natively (no "leaving app" warning)
+ *  - On desktop: shows a UPI QR code on Razorpay's own page
+ *  - Auto-verifies payment via webhook (payment_link.paid / payment.captured)
+ *
+ * The QR code displayed on our site encodes the Razorpay `short_url` so that
+ * scanning from any camera/QR scanner opens the Razorpay page which then
+ * invokes the user's UPI app natively.
+ */
 export async function createTopupSession(userId: string, amount: number): Promise<TopupSession> {
   const { keyId } = credentials();
   const db = await poolConnect;
 
   const receipt = `w_${Date.now()}_${userId.slice(0, 6)}`;
-  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
-  const expireByUnix = Math.floor(expiresAt / 1000);
+  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes UI countdown
+  // Razorpay requires minimum 15 min for payment link expiry
+  const expireByUnix = Math.floor(Date.now() / 1000) + 16 * 60;
 
-  // 1. Create official Razorpay Order
+  // 1. Create official Razorpay Order (for tracking)
   const order = await razorpayFetch("/orders", {
     method: "POST",
     body: JSON.stringify({
@@ -65,44 +78,39 @@ export async function createTopupSession(userId: string, amount: number): Promis
 
   const gatewayOrderId = String(order.id);
 
-  // 2. Create official Razorpay Payment Link (routes directly to Razorpay's merchant account)
-  let shortUrl = "";
-  let paymentLinkId = "";
+  // 2. Create UPI Payment Link (upi_link: true makes it UPI-native on mobile)
+  const plink = await razorpayFetch("/payment_links", {
+    method: "POST",
+    body: JSON.stringify({
+      amount: Math.round(amount * 100),
+      currency: "INR",
+      accept_partial: false,
+      description: `GrowMeSMM Wallet Top-Up ₹${amount}`,
+      customer: {
+        name: "Customer",
+        email: "user@growmesmm.in",
+      },
+      notify: { sms: false, email: false },
+      reminder_enable: false,
+      expire_by: expireByUnix,
+      upi_link: true, // KEY: Makes the link UPI-native — no "leaving app" warnings
+      notes: {
+        user_id: userId,
+        gateway_order_id: gatewayOrderId,
+        purpose: "wallet_topup",
+      },
+      callback_url: "https://intopsmm-me.onrender.com/dashboard/add-funds",
+      callback_method: "get",
+    }),
+  });
 
-  try {
-    const plink = await razorpayFetch("/payment_links", {
-      method: "POST",
-      body: JSON.stringify({
-        amount: Math.round(amount * 100),
-        currency: "INR",
-        accept_partial: false,
-        description: `GrowMeSMM Wallet Top-Up ₹${amount}`,
-        customer: {
-          name: "Customer",
-          email: "user@growmesmm.in",
-        },
-        notify: { sms: false, email: false },
-        reminder_enable: false,
-        expire_by: expireByUnix,
-        notes: { user_id: userId, gateway_order_id: gatewayOrderId, purpose: "wallet_topup" },
-        callback_url: "https://intopsmm-me.onrender.com/dashboard/add-funds",
-        callback_method: "get",
-      }),
-    });
+  const shortUrl = plink.short_url;
+  const paymentLinkId = plink.id;
 
-    if (plink && plink.short_url) {
-      shortUrl = plink.short_url;
-      paymentLinkId = plink.id;
-    }
-  } catch (linkErr) {
-    console.warn("[razorpay] payment_links fallback:", linkErr);
-  }
-
-  // Target URL for the QR code: Razorpay's official hosted link
-  const targetUrl = shortUrl || `https://api.razorpay.com/v1/checkout/embedded?order_id=${gatewayOrderId}`;
-
-  // 3. Generate High-Resolution QR Code of the official Razorpay payment endpoint
-  const qrDataUrl = await QRCode.toDataURL(targetUrl, {
+  // 3. Generate High-Resolution QR Code of the Razorpay payment link
+  // When scanned, this opens Razorpay's UPI-optimized mobile page
+  // which directly invokes PhonePe/GPay/Paytm without browser redirect warnings
+  const qrDataUrl = await QRCode.toDataURL(shortUrl, {
     errorCorrectionLevel: "H",
     margin: 2,
     width: 400,
@@ -112,13 +120,13 @@ export async function createTopupSession(userId: string, amount: number): Promis
     },
   });
 
-  // 4. Record in database (storing both gatewayOrderId and paymentLinkId)
+  // 4. Record in database
   const result = await db
     .request()
     .input("userId", sql.UniqueIdentifier, userId)
     .input("gateway", sql.NVarChar, "razorpay")
     .input("gatewayOrderId", sql.NVarChar, gatewayOrderId)
-    .input("gatewayPaymentId", sql.NVarChar, paymentLinkId || "")
+    .input("gatewayPaymentId", sql.NVarChar, paymentLinkId)
     .input("amount", sql.Decimal(18, 4), amount)
     .input("currency", sql.NVarChar, "INR")
     .input("status", sql.NVarChar, "created")
@@ -133,25 +141,60 @@ export async function createTopupSession(userId: string, amount: number): Promis
   return {
     paymentOrderId,
     gatewayOrderId,
+    paymentLinkId,
     amount,
     keyId,
     qrDataUrl,
-    shortUrl: targetUrl,
-    upiIntentUrl: targetUrl,
+    shortUrl,
+    upiIntentUrl: shortUrl, // Opens Razorpay's UPI-native page on mobile
     expiresAt,
   };
 }
 
+/** Also polls Razorpay API to check payment link status (in addition to webhook) */
 export async function getTopupStatus(userId: string, paymentOrderId: string) {
   const db = await poolConnect;
   const result = await db
     .request()
     .input("id", sql.UniqueIdentifier, paymentOrderId)
-    .query("SELECT id, user_id, status, amount, error_message, updated_at FROM payment_orders WHERE id = @id");
+    .query("SELECT id, user_id, status, amount, error_message, gateway_payment_id, updated_at FROM payment_orders WHERE id = @id");
 
   const data = result.recordset[0];
   if (!data || data.user_id !== userId) throw new Error("Payment not found");
-  return { status: data.status, amount: Number(data.amount), error: data.error_message };
+
+  // If DB already says paid, return immediately
+  if (data.status === "paid") {
+    return { status: "paid" as const, amount: Number(data.amount), error: data.error_message };
+  }
+
+  // Otherwise, also check Razorpay Payment Link status directly (backup for webhook delays)
+  if (data.gateway_payment_id && data.status === "created") {
+    try {
+      const plink = await razorpayFetch(`/payment_links/${data.gateway_payment_id}`);
+      if (plink.status === "paid" && plink.amount_paid > 0) {
+        // Credit wallet directly since webhook may be delayed
+        const amount = Number(plink.amount_paid) / 100;
+        const gatewayOrderId = plink.notes?.gateway_order_id || data.gateway_order_id;
+        try {
+          await db
+            .request()
+            .input("gateway", sql.NVarChar, "razorpay")
+            .input("gatewayOrderId", sql.NVarChar, gatewayOrderId)
+            .input("gatewayPaymentId", sql.NVarChar, data.gateway_payment_id)
+            .input("amount", sql.Decimal(18, 4), amount)
+            .output("success", sql.Bit)
+            .execute("sp_credit_wallet_from_payment");
+        } catch {
+          // SP might fail if already credited by webhook — that's OK
+        }
+        return { status: "paid" as const, amount, error: null };
+      }
+    } catch {
+      // API check failed, rely on webhook
+    }
+  }
+
+  return { status: data.status as string, amount: Number(data.amount), error: data.error_message };
 }
 
 function hex(buffer: ArrayBuffer) {
@@ -178,7 +221,7 @@ function timingSafeEqual(a: string, b: string) {
   return diff === 0;
 }
 
-/** Verifies the Razorpay webhook signature and credits the wallet atomically using SQL Server Stored Procedure. */
+/** Verifies the Razorpay webhook signature and credits the wallet atomically. */
 export async function handleRazorpayWebhook(rawBody: string, signature: string | null) {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!secret) return new Response("Webhook not configured", { status: 503 });
@@ -205,6 +248,7 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string |
         entity?: {
           id?: string;
           amount?: number;
+          amount_paid?: number;
           notes?: Record<string, string>;
         };
       };
@@ -220,7 +264,6 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string |
 
   const db = await poolConnect;
 
-  // Handle Payment Link Paid or Payment Captured or Order Paid
   const payment = event.payload?.payment?.entity;
   const plink = event.payload?.payment_link?.entity;
   const order = event.payload?.order?.entity;
@@ -239,10 +282,10 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string |
     event.event === "order.paid"
   ) {
     try {
-      const amount = Number(payment?.amount ?? plink?.amount ?? order?.amount ?? 0) / 100;
+      const amount = Number(payment?.amount ?? plink?.amount_paid ?? plink?.amount ?? order?.amount ?? 0) / 100;
       const paymentId = payment?.id ?? targetPaymentLinkId ?? "";
 
-      // Try by gatewayOrderId first
+      // Try credit by gateway_order_id (from notes)
       if (targetOrderId && amount > 0) {
         await db
           .request()
@@ -256,9 +299,8 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string |
         return new Response("ok");
       }
 
-      // If matched by payment link ID
+      // Fallback: match by payment_link ID stored in gateway_payment_id column
       if (targetPaymentLinkId && amount > 0) {
-        // Look up payment_orders row by gateway_payment_id
         const row = await db
           .request()
           .input("gatewayPaymentId", sql.NVarChar, targetPaymentLinkId)

@@ -21,8 +21,6 @@ import {
   RefreshCw,
   Sparkles,
   ExternalLink,
-  Copy,
-  Check,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { checkWalletTopup, createWalletTopup, listMyTopups } from "@/lib/payments.functions";
@@ -54,8 +52,10 @@ const MAX_AMOUNT = 200000;
 type ActiveQRSession = {
   paymentOrderId: string;
   gatewayOrderId: string;
+  paymentLinkId: string;
   amount: number;
   qrDataUrl: string;
+  shortUrl: string;
   upiIntentUrl?: string;
   expiresAt: number;
 };
@@ -67,7 +67,6 @@ function AddFundsPage() {
   const [activeSession, setActiveSession] = useState<ActiveQRSession | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [copiedUpi, setCopiedUpi] = useState(false);
 
   const queryClient = useQueryClient();
   const fetchTopups = useServerFn(listMyTopups);
@@ -154,14 +153,6 @@ function AddFundsPage() {
     toast.info("QR Code downloaded! Open PhonePe/GPay/Paytm to scan from gallery.");
   };
 
-  // Copy UPI Intent link
-  const handleCopyUPI = () => {
-    if (!activeSession?.upiIntentUrl) return;
-    navigator.clipboard.writeText(activeSession.upiIntentUrl);
-    setCopiedUpi(true);
-    setTimeout(() => setCopiedUpi(false), 2000);
-    toast.success("UPI link copied!");
-  };
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
@@ -336,25 +327,14 @@ function AddFundsPage() {
                         >
                           <Download className="mr-1.5 h-4 w-4" /> Download QR
                         </Button>
-                        {activeSession.upiIntentUrl ? (
-                          <Button
-                            asChild
-                            className="h-11 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700"
-                          >
-                            <a href={activeSession.upiIntentUrl}>
-                              <ExternalLink className="mr-1.5 h-4 w-4" /> Pay via App
-                            </a>
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            onClick={handleCopyUPI}
-                            className="h-11 rounded-xl border-border/80 text-xs font-bold"
-                          >
-                            {copiedUpi ? <Check className="mr-1.5 h-4 w-4 text-emerald-400" /> : <Copy className="mr-1.5 h-4 w-4" />}
-                            {copiedUpi ? "Copied!" : "Copy Link"}
-                          </Button>
-                        )}
+                        <Button
+                          asChild
+                          className="h-11 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700"
+                        >
+                          <a href={activeSession.shortUrl} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="mr-1.5 h-4 w-4" /> Open & Pay
+                          </a>
+                        </Button>
                       </div>
 
                       {/* Live Polling Status */}
