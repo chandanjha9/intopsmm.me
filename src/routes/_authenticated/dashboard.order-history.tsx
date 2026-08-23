@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Search,
   Copy,
@@ -87,6 +88,7 @@ const inr = (n: number) =>
   `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
 
 function OrderHistoryPage() {
+  const { refreshProfile } = useAuth();
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
@@ -103,8 +105,16 @@ function OrderHistoryPage() {
         return [];
       }
     },
-    refetchInterval: 30_000, // Poll every 30s so status updates appear quickly
+    refetchInterval: 5_000, // Poll every 5s so status updates and refunds appear quickly
   });
+
+  // Periodically refresh profile balance so refunded balance updates immediately in sidebar
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void refreshProfile();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [refreshProfile]);
 
   const displayId = (order: (typeof orders)[number]) => {
     const links = (order as { provider_orders?: { provider_order_id: string | null }[] | { provider_order_id: string | null } | null })

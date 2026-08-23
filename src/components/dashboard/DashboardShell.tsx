@@ -167,7 +167,7 @@ export function DashboardShell({ active, children }: { active: string; children:
 
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-6">
-          <Link to="/" className="inline-flex items-center gap-2">
+          <Link to="/dashboard" className="inline-flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
               <TrendingUp className="h-5 w-5" />
             </span>

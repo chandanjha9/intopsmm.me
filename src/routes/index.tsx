@@ -122,7 +122,7 @@ function Nav() {
               <TrendingUp className="h-5 w-5" />
             </span>
             <span className="text-lg font-bold tracking-tight">
-              Growth<span className="gradient-text">Panel</span>
+              Intop<span className="gradient-text">smm</span>
             </span>
           </a>
           <nav className="hidden items-center gap-8 md:flex">
