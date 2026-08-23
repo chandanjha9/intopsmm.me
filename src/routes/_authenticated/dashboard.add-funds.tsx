@@ -21,6 +21,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { useAuth } from "@/hooks/use-auth";
 import { createWalletTopup, submitUpiUtr, checkWalletTopup, listMyTopups } from "@/lib/payments.functions";
 import { toast } from "sonner";
 
@@ -69,6 +70,7 @@ function AddFundsPage() {
   const [isUnderReview, setIsUnderReview] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
+  const { refreshProfile } = useAuth();
   const queryClient = useQueryClient();
   const fetchTopups = useServerFn(listMyTopups);
   const startTopup = useServerFn(createWalletTopup);
@@ -79,6 +81,11 @@ function AddFundsPage() {
   const amt = Math.max(0, Number(amount) || 0);
 
   const topups = useQuery({ queryKey: ["my-topups"], queryFn: () => fetchTopups({}) });
+
+  // Refresh profile on mount to always display newest balance
+  useEffect(() => {
+    void refreshProfile();
+  }, [refreshProfile]);
 
   const amountError =
     amount !== "" && (amt < MIN_AMOUNT || amt > MAX_AMOUNT)
@@ -114,8 +121,10 @@ function AddFundsPage() {
         if (res.status === "paid") {
           setPaymentSuccess(true);
           setIsUnderReview(false);
-          toast.success(`🎉 Payment of ₹${fmt.format(activeSession.amount)} Approved & Added to Wallet!`);
+          // Instant refresh of auth profile & all queries across the entire app
+          await refreshProfile();
           await queryClient.invalidateQueries();
+          toast.success(`🎉 Payment of ₹${fmt.format(activeSession.amount)} Approved & Added to Wallet!`);
           clearInterval(pollTimer);
         } else if (res.status === "failed") {
           setIsUnderReview(false);
@@ -128,7 +137,7 @@ function AddFundsPage() {
     }, 2500);
 
     return () => clearInterval(pollTimer);
-  }, [activeSession, paymentSuccess, checkTopup, queryClient, fmt]);
+  }, [activeSession, paymentSuccess, checkTopup, queryClient, refreshProfile, fmt]);
 
   // Generate dynamic QR code
   const handleGenerateQR = async () => {

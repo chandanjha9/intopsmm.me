@@ -81,21 +81,28 @@ export async function submitUtrForVerification(
     utrNumber: string;
   }
 ) {
-  const cleanUtr = params.utrNumber.trim();
-  if (cleanUtr.length < 6) {
-    throw new Error("Please enter a valid 12-digit UPI Transaction / UTR Number");
+  const cleanUtr = params.utrNumber.trim().toUpperCase();
+
+  // Validate UTR format: 10 to 22 alphanumeric characters
+  if (!/^[A-Z0-9]{10,22}$/.test(cleanUtr)) {
+    throw new Error("Please enter a valid 12-digit UPI UTR / Transaction Ref ID from your payment receipt.");
   }
 
   const db = await poolConnect;
 
-  // Check if UTR was already approved on another order
+  // Check if UTR was already submitted on another order (paid or under_review)
   const checkDuplicate = await db
     .request()
     .input("utr", sql.NVarChar, cleanUtr)
-    .query("SELECT id FROM payment_orders WHERE gateway_payment_id = @utr AND status = 'paid'");
+    .query("SELECT id, status FROM payment_orders WHERE gateway_payment_id = @utr AND status IN ('paid', 'under_review')");
 
   if (checkDuplicate.recordset.length > 0) {
-    throw new Error("This UTR / Transaction ID has already been used and credited.");
+    const existing = checkDuplicate.recordset[0];
+    if (existing.status === "paid") {
+      throw new Error("This UTR / Transaction ID has already been credited to a wallet.");
+    } else {
+      throw new Error("This UTR / Transaction ID has already been submitted and is currently pending verification.");
+    }
   }
 
   // Fetch payment order and user email from users table

@@ -35,24 +35,50 @@ export async function registerUser(input: {
   const email = input.email.trim().toLowerCase();
 
   // Check if email already exists
+  const cleanEmail = email.trim().toLowerCase();
+  const rawUsername = input.username?.trim();
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(cleanEmail)) {
+    throw new Error("Please enter a valid email address.");
+  }
+
+  // Check duplicate email
   const existingUser = await db
     .request()
-    .input("email", sql.NVarChar, email)
-    .query("SELECT id FROM users WHERE email = @email");
+    .input("email", sql.NVarChar, cleanEmail)
+    .query("SELECT id FROM users WHERE LOWER(email) = LOWER(@email)");
 
   if (existingUser.recordset.length > 0) {
-    throw new Error("An account with this email already exists");
+    throw new Error("An account with this email address already exists. Please login instead.");
+  }
+
+  // Validate and check duplicate username
+  let derivedUsername = rawUsername;
+  if (rawUsername) {
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(rawUsername)) {
+      throw new Error("Username must be 3-30 characters long and contain only letters, numbers, and underscores.");
+    }
+    const existingUsername = await db
+      .request()
+      .input("username", sql.NVarChar, rawUsername)
+      .query("SELECT id FROM profiles WHERE LOWER(username) = LOWER(@username)");
+
+    if (existingUsername.recordset.length > 0) {
+      throw new Error("This username is already taken. Please choose another username.");
+    }
+  } else {
+    derivedUsername = `${cleanEmail.split("@")[0]}_${Math.random().toString(36).substring(2, 7)}`;
   }
 
   const passwordHash = await hashPassword(input.password);
-  const derivedUsername =
-    input.username?.trim() || `${email.split("@")[0]}_${Math.random().toString(36).substring(2, 7)}`;
   const fullName = input.fullName?.trim() || null;
 
   // Determine initial role
   const isAdmin =
-    email.startsWith("admin") ||
-    email === "admin@growmesmm.in" ||
+    cleanEmail.startsWith("admin") ||
+    cleanEmail === "admin@growmesmm.in" ||
     derivedUsername.toLowerCase() === "admin";
   const role: "admin" | "moderator" | "user" = isAdmin ? "admin" : "user";
 
