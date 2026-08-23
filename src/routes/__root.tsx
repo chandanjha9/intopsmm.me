@@ -80,21 +80,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "GrowthPanel — SMM Panel for Social Media Growth" },
+      { title: "Intopsmm — SMM Panel for Social Media Growth" },
       {
         name: "description",
         content:
-          "GrowthPanel is a fast, secure and automated SMM panel offering followers, likes, views and engagement services for every major social platform.",
+          "Intopsmm is a fast, secure and automated SMM panel offering followers, likes, views and engagement services for every major social platform.",
       },
-      { name: "author", content: "GrowthPanel" },
-      { property: "og:title", content: "GrowthPanel — #1 SMM Panel for Instant Growth" },
+      { name: "author", content: "Intopsmm" },
+      { property: "og:title", content: "Intopsmm — #1 SMM Panel for Instant Growth" },
       {
         property: "og:description",
         content:
-          "Boost your social media presence with 1600+ high-quality services, instant delivery and 24/7 expert support from GrowthPanel.",
+          "Boost your social media presence with 1600+ high-quality services, instant delivery and 24/7 expert support from Intopsmm.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:site_name", content: "GrowthPanel" },
+      { property: "og:site_name", content: "Intopsmm" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     scripts: [
@@ -105,17 +105,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "@graph": [
             {
               "@type": "WebSite",
-              name: "GrowthPanel",
-              url: "https://growmesmm.lovable.app",
+              name: "Intopsmm",
+              url: "https://intopsmm-me.onrender.com",
               description:
                 "Fast, secure and automated SMM panel services for creators, agencies and resellers.",
             },
             {
               "@type": "Organization",
-              name: "GrowthPanel",
-              url: "https://growmesmm.lovable.app",
+              name: "Intopsmm",
+              url: "https://intopsmm-me.onrender.com",
               description:
-                "GrowthPanel provides social media marketing services including followers, likes, views and engagement across all major platforms.",
+                "Intopsmm provides social media marketing services including followers, likes, views and engagement across all major platforms.",
             },
           ],
         }),

@@ -20,13 +20,13 @@ import {
 export const Route = createFileRoute("/_authenticated/admin/providers")({
   head: () => ({
     meta: [
-      { title: "Supplier Providers | GrowthPanel Admin" },
+      { title: "Supplier Providers | Intopsmm Admin" },
       {
         name: "description",
         content:
           "Add, edit and health-check SMM supplier APIs. Store encrypted API keys, set priority, timeouts and currency per provider.",
       },
-      { property: "og:title", content: "Supplier Providers | GrowthPanel Admin" },
+      { property: "og:title", content: "Supplier Providers | Intopsmm Admin" },
       {
         property: "og:description",
         content: "Manage SMM supplier API credentials, priority and connection health.",

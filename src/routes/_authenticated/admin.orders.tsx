@@ -24,7 +24,7 @@ import {
 export const Route = createFileRoute("/_authenticated/admin/orders")({
   head: () => ({
     meta: [
-      { title: "Manage Orders | GrowthPanel Admin" },
+      { title: "Manage Orders | Intopsmm Admin" },
       {
         name: "description",
         content: "View and manage all customer orders. Update order statuses, sync from provider, and handle refunds.",

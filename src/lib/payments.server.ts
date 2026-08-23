@@ -22,7 +22,7 @@ export async function createTopupSession(userId: string, amount: number): Promis
   const db = await poolConnect;
 
   const upiVpa = process.env.UPI_VPA || "chandanjha45@ybl";
-  const upiName = process.env.UPI_NAME || "GrowMeSMM";
+  const upiName = process.env.UPI_NAME || "Intopsmm";
 
   const orderRef = `GMSMM${Date.now().toString().slice(-8)}`;
   const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity

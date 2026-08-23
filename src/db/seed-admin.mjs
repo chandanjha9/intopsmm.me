@@ -95,7 +95,7 @@ async function seed() {
     email: 'admin@growmesmm.in',
     plainPassword: 'Admin@12345',
     username: 'admin',
-    fullName: 'GrowthPanel Administrator',
+    fullName: 'Intopsmm Administrator',
     role: 'admin',
     walletBalance: 10000.00,
   });

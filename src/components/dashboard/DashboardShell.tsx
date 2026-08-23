@@ -4,6 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   TrendingUp,
   Wallet,
   Plus,
@@ -15,6 +23,7 @@ import {
   RefreshCcw,
   ShieldCheck,
   ShoppingBag,
+  LogOut,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -36,6 +45,8 @@ export function DashboardShell({ active, children }: { active: string; children:
   const queryClient = useQueryClient();
   const { profile, user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const checkAdmin = useServerFn(isCurrentUserAdmin);
 
   const { data: adminCheck } = useQuery({
@@ -55,11 +66,17 @@ export function DashboardShell({ active, children }: { active: string; children:
   const username = profile?.username ?? user?.email?.split("@")[0] ?? "member";
   const balance = `₹ ${(profile?.wallet_balance ?? 0).toFixed(4)}`;
 
-  const handleSignOut = async () => {
-    await queryClient.cancelQueries();
-    queryClient.clear();
-    await logout();
-    navigate({ to: "/login", replace: true });
+  const handleConfirmSignOut = async () => {
+    setIsLoggingOut(true);
+    try {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      await logout();
+      setShowLogoutConfirm(false);
+      navigate({ to: "/login", replace: true });
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const sidebarPanel = (
@@ -125,10 +142,15 @@ export function DashboardShell({ active, children }: { active: string; children:
         <p className="text-sm font-semibold">Good Day 🤝</p>
         <p className="truncate text-xs text-muted-foreground">{username}</p>
         <div className="mt-3 flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1">
-            Settings
+          <Button variant="outline" size="sm" className="flex-1" asChild>
+            <Link to="/dashboard">Settings</Link>
           </Button>
-          <Button variant="outline" size="sm" className="flex-1" onClick={handleSignOut}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setShowLogoutConfirm(true)}
+          >
             Logout
           </Button>
         </div>
@@ -149,7 +171,7 @@ export function DashboardShell({ active, children }: { active: string; children:
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
               <TrendingUp className="h-5 w-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">GrowthPanel</span>
+            <span className="text-lg font-bold tracking-tight">Intopsmm</span>
           </Link>
           <div className="ml-auto flex items-center gap-2">
             <Button
@@ -183,6 +205,39 @@ export function DashboardShell({ active, children }: { active: string; children:
 
         <main className="min-w-0 flex-1 space-y-6">{children}</main>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <Dialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <DialogContent className="sm:max-w-[420px] rounded-2xl p-6 border-border/60">
+          <DialogHeader className="space-y-2 text-center sm:text-left">
+            <div className="mx-auto sm:mx-0 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/15 text-destructive">
+              <LogOut className="h-6 w-6" />
+            </div>
+            <DialogTitle className="text-lg font-bold">Confirm Log Out</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Are you sure you want to log out of your <strong>Intopsmm</strong> account? You will need to enter your password to log in again.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              disabled={isLoggingOut}
+              onClick={() => setShowLogoutConfirm(false)}
+              className="rounded-xl font-semibold"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isLoggingOut}
+              onClick={handleConfirmSignOut}
+              className="rounded-xl font-bold bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isLoggingOut ? "Logging out…" : "Yes, Log Out"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

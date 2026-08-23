@@ -12,13 +12,13 @@ import { adminListLogs } from "@/lib/providers/admin.functions";
 export const Route = createFileRoute("/_authenticated/admin/logs")({
   head: () => ({
     meta: [
-      { title: "Provider API Logs | GrowthPanel Admin" },
+      { title: "Provider API Logs | Intopsmm Admin" },
       {
         name: "description",
         content:
           "Inspect every supplier API call: action, HTTP status, latency, retries and error messages for fast troubleshooting.",
       },
-      { property: "og:title", content: "Provider API Logs | GrowthPanel Admin" },
+      { property: "og:title", content: "Provider API Logs | Intopsmm Admin" },
       {
         property: "og:description",
         content: "Audit supplier API calls with status, latency and retry details.",

@@ -28,13 +28,13 @@ import { listMyOrders, listServices, placeOrder } from "@/lib/orders.functions";
 export const Route = createFileRoute("/_authenticated/dashboard/")({
   head: () => ({
     meta: [
-      { title: "New Order — GrowthPanel Dashboard" },
+      { title: "New Order — Intopsmm Dashboard" },
       {
         name: "description",
         content:
-          "Place new SMM orders, track your wallet balance, success rate and total orders from your GrowthPanel dashboard.",
+          "Place new SMM orders, track your wallet balance, success rate and total orders from your Intopsmm dashboard.",
       },
-      { property: "og:title", content: "New Order — GrowthPanel Dashboard" },
+      { property: "og:title", content: "New Order — Intopsmm Dashboard" },
       { property: "og:description", content: "Place orders, track balance and manage campaigns." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

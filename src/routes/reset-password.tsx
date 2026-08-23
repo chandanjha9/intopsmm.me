@@ -11,10 +11,10 @@ import { BrandingPane } from "./login";
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
-      { title: "Reset password — GrowthPanel" },
-      { name: "description", content: "Choose a new password for your GrowthPanel account." },
-      { property: "og:title", content: "Reset password — GrowthPanel" },
-      { property: "og:description", content: "Set a new GrowthPanel password." },
+      { title: "Reset password — Intopsmm" },
+      { name: "description", content: "Choose a new password for your Intopsmm account." },
+      { property: "og:title", content: "Reset password — Intopsmm" },
+      { property: "og:description", content: "Set a new Intopsmm password." },
     ],
   }),
   component: ResetPasswordPage,
@@ -59,7 +59,7 @@ function ResetPasswordPage() {
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
               <TrendingUp className="h-5 w-5" />
             </span>
-            <span className="text-lg font-bold">GrowthPanel</span>
+            <span className="text-lg font-bold">Intopsmm</span>
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">Set a new password</h1>
           <p className="mt-2 text-sm text-muted-foreground">

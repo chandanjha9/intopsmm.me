@@ -23,13 +23,13 @@ import { listMyOrders } from "@/lib/orders.functions";
 export const Route = createFileRoute("/_authenticated/dashboard/order-history")({
   head: () => ({
     meta: [
-      { title: "Order History — GrowthPanel Dashboard" },
+      { title: "Order History — Intopsmm Dashboard" },
       {
         name: "description",
         content:
           "Track every SMM order you placed: status, start count, delivered quantity, link and price in INR.",
       },
-      { property: "og:title", content: "Order History — GrowthPanel Dashboard" },
+      { property: "og:title", content: "Order History — Intopsmm Dashboard" },
       { property: "og:description", content: "Track all your order statuses in one place." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

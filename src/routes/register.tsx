@@ -33,9 +33,9 @@ const signUpSchema = z.object({
 export const Route = createFileRoute("/register")({
   head: () => ({
     meta: [
-      { title: "Create account — GrowthPanel" },
-      { name: "description", content: "Create your GrowthPanel account and start growing your social media in minutes." },
-      { property: "og:title", content: "Create account — GrowthPanel" },
+      { title: "Create account — Intopsmm" },
+      { name: "description", content: "Create your Intopsmm account and start growing your social media in minutes." },
+      { property: "og:title", content: "Create account — Intopsmm" },
       { property: "og:description", content: "Free to start. Pay only for what you use." },
     ],
   }),
@@ -108,7 +108,7 @@ function RegisterPage() {
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
               <TrendingUp className="h-5 w-5" />
             </span>
-            <span className="text-lg font-bold">GrowthPanel</span>
+            <span className="text-lg font-bold">Intopsmm</span>
           </Link>
 
           <div className="mb-6 flex items-center gap-2">

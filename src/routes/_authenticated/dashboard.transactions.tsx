@@ -11,14 +11,14 @@ import { listMyTransactions } from "@/lib/orders.functions";
 export const Route = createFileRoute("/_authenticated/dashboard/transactions")({
   head: () => ({
     meta: [
-      { title: "Transactions — GrowthPanel Dashboard" },
+      { title: "Transactions — Intopsmm Dashboard" },
       {
         name: "description",
         content:
           "Review every wallet transaction: additions, deductions and refunds with amounts in INR, dates and linked order IDs.",
       },
-      { property: "og:title", content: "Transactions — GrowthPanel Dashboard" },
-      { property: "og:description", content: "Every credit, debit and refund on your GrowthPanel wallet." },
+      { property: "og:title", content: "Transactions — Intopsmm Dashboard" },
+      { property: "og:description", content: "Every credit, debit and refund on your Intopsmm wallet." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },

@@ -32,6 +32,7 @@ import { Route as ApiPublicHooksImportServicesRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksRazorpayRouteImport } from './routes/api/public/hooks/razorpay'
 import { Route as ApiPublicHooksRetryFailedOrdersRouteImport } from './routes/api/public/hooks/retry-failed-orders'
 import { Route as ApiPublicHooksStatusSyncRouteImport } from './routes/api/public/hooks/status-sync'
+import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -159,6 +160,11 @@ const ApiPublicHooksStatusSyncRoute =
     path: '/api/public/hooks/status-sync',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksTelegramRoute = ApiPublicHooksTelegramRouteImport.update({
+  id: '/api/public/hooks/telegram',
+  path: '/api/public/hooks/telegram',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -183,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/razorpay': typeof ApiPublicHooksRazorpayRoute
   '/api/public/hooks/retry-failed-orders': typeof ApiPublicHooksRetryFailedOrdersRoute
   '/api/public/hooks/status-sync': typeof ApiPublicHooksStatusSyncRoute
+  '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -206,6 +213,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/razorpay': typeof ApiPublicHooksRazorpayRoute
   '/api/public/hooks/retry-failed-orders': typeof ApiPublicHooksRetryFailedOrdersRoute
   '/api/public/hooks/status-sync': typeof ApiPublicHooksStatusSyncRoute
+  '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/api/public/hooks/razorpay': typeof ApiPublicHooksRazorpayRoute
   '/api/public/hooks/retry-failed-orders': typeof ApiPublicHooksRetryFailedOrdersRoute
   '/api/public/hooks/status-sync': typeof ApiPublicHooksStatusSyncRoute
+  '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -258,6 +267,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/razorpay'
     | '/api/public/hooks/retry-failed-orders'
     | '/api/public/hooks/status-sync'
+    | '/api/public/hooks/telegram'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -281,6 +291,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/razorpay'
     | '/api/public/hooks/retry-failed-orders'
     | '/api/public/hooks/status-sync'
+    | '/api/public/hooks/telegram'
   id:
     | '__root__'
     | '/'
@@ -306,6 +317,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/razorpay'
     | '/api/public/hooks/retry-failed-orders'
     | '/api/public/hooks/status-sync'
+    | '/api/public/hooks/telegram'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -321,6 +333,7 @@ export interface RootRouteChildren {
   ApiPublicHooksRazorpayRoute: typeof ApiPublicHooksRazorpayRoute
   ApiPublicHooksRetryFailedOrdersRoute: typeof ApiPublicHooksRetryFailedOrdersRoute
   ApiPublicHooksStatusSyncRoute: typeof ApiPublicHooksStatusSyncRoute
+  ApiPublicHooksTelegramRoute: typeof ApiPublicHooksTelegramRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -486,6 +499,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksStatusSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/telegram': {
+      id: '/api/public/hooks/telegram'
+      path: '/api/public/hooks/telegram'
+      fullPath: '/api/public/hooks/telegram'
+      preLoaderRoute: typeof ApiPublicHooksTelegramRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -547,6 +567,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksRazorpayRoute: ApiPublicHooksRazorpayRoute,
   ApiPublicHooksRetryFailedOrdersRoute: ApiPublicHooksRetryFailedOrdersRoute,
   ApiPublicHooksStatusSyncRoute: ApiPublicHooksStatusSyncRoute,
+  ApiPublicHooksTelegramRoute: ApiPublicHooksTelegramRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Sparkles,
   ExternalLink,
+  AlertCircle,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuth } from "@/hooks/use-auth";
@@ -28,13 +29,13 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
   head: () => ({
     meta: [
-      { title: "Top Up Wallet — GrowthPanel" },
+      { title: "Top Up Wallet — Intopsmm" },
       {
         name: "description",
         content:
           "Scan the 5-minute dynamic UPI QR code with your entered amount and top up your wallet instantly in INR.",
       },
-      { property: "og:title", content: "Top Up Wallet — GrowthPanel" },
+      { property: "og:title", content: "Top Up Wallet — Intopsmm" },
       { property: "og:description", content: "Enter an amount, scan the 5-min QR and pay with any UPI app." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -68,6 +69,8 @@ function AddFundsPage() {
   const [utrNumber, setUtrNumber] = useState("");
   const [isVerifyingUtr, setIsVerifyingUtr] = useState(false);
   const [isUnderReview, setIsUnderReview] = useState(false);
+  const [isRejected, setIsRejected] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const { refreshProfile } = useAuth();
@@ -121,14 +124,16 @@ function AddFundsPage() {
         if (res.status === "paid") {
           setPaymentSuccess(true);
           setIsUnderReview(false);
-          // Instant refresh of auth profile & all queries across the entire app
+          setIsRejected(false);
           await refreshProfile();
           await queryClient.invalidateQueries();
           toast.success(`🎉 Payment of ₹${fmt.format(activeSession.amount)} Approved & Added to Wallet!`);
           clearInterval(pollTimer);
-        } else if (res.status === "failed") {
+        } else if (res.status === "failed" || res.status === "rejected") {
           setIsUnderReview(false);
-          toast.error("Payment rejected by Admin (Invalid UTR number).");
+          setIsRejected(true);
+          setRejectionReason(res.error || "Payment was rejected (Invalid UTR / Transaction Not Found).");
+          toast.error("❌ Payment rejected: Invalid or unverified UTR number.");
           clearInterval(pollTimer);
         }
       } catch {
@@ -145,6 +150,8 @@ function AddFundsPage() {
     setIsGenerating(true);
     setPaymentSuccess(false);
     setIsUnderReview(false);
+    setIsRejected(false);
+    setRejectionReason("");
     setUtrNumber("");
 
     try {
@@ -168,6 +175,7 @@ function AddFundsPage() {
     }
 
     setIsVerifyingUtr(true);
+    setIsRejected(false);
     try {
       await verifyUtr({
         data: {
@@ -177,7 +185,7 @@ function AddFundsPage() {
       });
 
       setIsUnderReview(true);
-      toast.info("⏳ UTR Submitted! Alert sent to Admin for instant 1-click verification.");
+      toast.info("⏳ UTR Submitted! Verification in progress...");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to submit UTR. Please check and try again.");
     } finally {
@@ -190,7 +198,7 @@ function AddFundsPage() {
     if (!activeSession?.qrDataUrl) return;
     const link = document.createElement("a");
     link.href = activeSession.qrDataUrl;
-    link.download = `GrowMeSMM-QR-₹${activeSession.amount}.png`;
+    link.download = `Intopsmm-QR-₹${activeSession.amount}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -313,12 +321,43 @@ function AddFundsPage() {
                           setActiveSession(null);
                           setPaymentSuccess(false);
                           setIsUnderReview(false);
+                          setIsRejected(false);
                           setUtrNumber("");
                         }}
                         className="mt-4 rounded-xl bg-emerald-500 font-semibold text-white hover:bg-emerald-600"
                       >
                         Add More Funds
                       </Button>
+                    </div>
+                  ) : isRejected ? (
+                    /* Rejection State */
+                    <div className="py-6 text-center space-y-3">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/20 text-destructive">
+                        <AlertCircle className="h-9 w-9" />
+                      </div>
+                      <h3 className="text-xl font-bold text-destructive">Payment Rejected</h3>
+                      <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                        {rejectionReason || "The UTR number you entered could not be verified in our bank statement."}
+                      </p>
+                      <div className="pt-2 flex justify-center gap-3">
+                        <Button
+                          onClick={() => {
+                            setIsRejected(false);
+                            setIsUnderReview(false);
+                            setUtrNumber("");
+                          }}
+                          className="rounded-xl bg-primary text-primary-foreground font-bold"
+                        >
+                          Try Again with Correct UTR
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleGenerateQR}
+                          className="rounded-xl border-border/80"
+                        >
+                          Generate New QR
+                        </Button>
+                      </div>
                     </div>
                   ) : timeLeft <= 0 ? (
                     /* Expired State */
@@ -405,10 +444,10 @@ function AddFundsPage() {
                           <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-center space-y-1.5">
                             <div className="flex items-center justify-center gap-2 text-xs font-bold text-amber-400">
                               <Loader2 className="h-4 w-4 animate-spin" />
-                              Verifying Payment with Admin…
+                              Payment Verification in Progress…
                             </div>
                             <p className="text-[11px] text-muted-foreground">
-                              Request sent to Admin Telegram. Your wallet will update automatically once verified.
+                              Payment verification in progress. Your wallet will update automatically once confirmed.
                             </p>
                           </div>
                         ) : (
@@ -467,12 +506,12 @@ function AddFundsPage() {
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
                   4
                 </span>
-                <span>Enter the <strong>12-digit UTR / UPI Ref ID</strong> and submit for 1-click Admin verification.</span>
+                <span>Enter the <strong>12-digit UTR / UPI Ref ID</strong> and submit for instant verification.</span>
               </li>
             </ol>
             <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-500/10 p-3 text-[11px] font-medium text-emerald-400">
               <ShieldCheck className="h-4 w-4 shrink-0" />
-              Direct 256-bit encrypted UPI instant payment gateway with Telegram admin verification.
+              Direct 256-bit encrypted UPI instant payment gateway.
             </div>
           </Card>
 

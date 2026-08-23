@@ -13,13 +13,13 @@ import { listMyOrders, listMyRefills, refillOrder } from "@/lib/orders.functions
 export const Route = createFileRoute("/_authenticated/dashboard/refill")({
   head: () => ({
     meta: [
-      { title: "Refill Requests — GrowthPanel Dashboard" },
+      { title: "Refill Requests — Intopsmm Dashboard" },
       {
         name: "description",
         content:
           "Request refills for completed SMM orders on refill-supported services and track every refill request status.",
       },
-      { property: "og:title", content: "Refill Requests — GrowthPanel Dashboard" },
+      { property: "og:title", content: "Refill Requests — Intopsmm Dashboard" },
       {
         property: "og:description",
         content: "Request and track refills for your completed orders.",

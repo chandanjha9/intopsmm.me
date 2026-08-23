@@ -18,13 +18,13 @@ import {
 export const Route = createFileRoute("/_authenticated/admin/")({
   head: () => ({
     meta: [
-      { title: "Admin Overview | GrowthPanel Control Center" },
+      { title: "Admin Overview | Intopsmm Control Center" },
       {
         name: "description",
         content:
-          "Monitor supplier balance, imported services, order pipeline health and API errors from the GrowthPanel admin overview.",
+          "Monitor supplier balance, imported services, order pipeline health and API errors from the Intopsmm admin overview.",
       },
-      { property: "og:title", content: "Admin Overview | GrowthPanel" },
+      { property: "og:title", content: "Admin Overview | Intopsmm" },
       {
         property: "og:description",
         content: "Supplier balance, service catalog and order pipeline health in one place.",

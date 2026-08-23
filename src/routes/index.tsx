@@ -43,13 +43,13 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "GrowthPanel — Cheapest & Fastest SMM Panel Services" },
+      { title: "Intopsmm — Cheapest & Fastest SMM Panel Services" },
       {
         name: "description",
         content:
-          "GrowthPanel is a fast, secure and fully automated SMM panel. 1600+ services, instant delivery, INR payments and 24/7 expert support.",
+          "Intopsmm is a fast, secure and fully automated SMM panel. 1600+ services, instant delivery, INR payments and 24/7 expert support.",
       },
-      { property: "og:title", content: "GrowthPanel — Cheapest & Fastest SMM Panel Services" },
+      { property: "og:title", content: "Intopsmm — Cheapest & Fastest SMM Panel Services" },
       {
         property: "og:description",
         content:
@@ -220,12 +220,12 @@ function Hero() {
           <Globe2 className="h-3.5 w-3.5" /> #1 Best SMM Panel
         </span>
         <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-tight sm:text-6xl">
-          GrowthPanel — The Fastest &amp; Cheapest{" "}
+          Intopsmm — The Fastest &amp; Cheapest{" "}
           <span className="gradient-text">SMM Panel</span> for Social Media Growth
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
           Boost your social media game and dominate the digital world with{" "}
-          <b className="text-foreground">GrowthPanel</b> — your trusted partner for unbeatable
+          <b className="text-foreground">Intopsmm</b> — your trusted partner for unbeatable
           growth strategies and professional support.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -307,12 +307,12 @@ function WhyChoose() {
   return (
     <section id="why" className="px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <SectionHeading before="Why Choose " highlight="GrowthPanel" after="?" />
+        <SectionHeading before="Why Choose " highlight="Intopsmm" after="?" />
         <Card className="glass mt-10 grid items-center gap-6 border-border/60 p-8 shadow-card md:grid-cols-[minmax(0,1fr)_260px]">
           <div>
             <h3 className="text-2xl font-bold">Swift and Seamless Solutions</h3>
             <p className="mt-3 text-muted-foreground">
-              GrowthPanel provides rapid ROI delivery. Experience instant impact with our swift and
+              Intopsmm provides rapid ROI delivery. Experience instant impact with our swift and
               seamless automated solutions.
             </p>
           </div>
@@ -341,20 +341,20 @@ function InsightCards() {
   const cards = [
     {
       title:
-        "At GrowthPanel, we proudly serve a global clientele. Here are the main regions where our clients are located:",
-      text: "GrowthPanel is highly regarded across South Asia, where India, Pakistan, Bangladesh and Sri Lanka frequently use our SMM panel services. We also serve a large number of clients in the USA, Canada, Brazil, Germany, UK, France, Russia and the UAE, along with Indonesia, Philippines, Malaysia and Singapore.",
+        "At Intopsmm, we proudly serve a global clientele. Here are the main regions where our clients are located:",
+      text: "Intopsmm is highly regarded across South Asia, where India, Pakistan, Bangladesh and Sri Lanka frequently use our SMM panel services. We also serve a large number of clients in the USA, Canada, Brazil, Germany, UK, France, Russia and the UAE, along with Indonesia, Philippines, Malaysia and Singapore.",
     },
     {
       title: "What is our USP?",
-      text: "At GrowthPanel we offer reliable, affordable and comprehensive SMM panel services designed to fuel your social media growth. Our platform provides tailored solutions for your unique needs, ensuring efficient and effective results. Whether you're growing on Instagram, YouTube, Facebook or any other platform, GrowthPanel is your go-to resource.",
+      text: "At Intopsmm we offer reliable, affordable and comprehensive SMM panel services designed to fuel your social media growth. Our platform provides tailored solutions for your unique needs, ensuring efficient and effective results. Whether you're growing on Instagram, YouTube, Facebook or any other platform, Intopsmm is your go-to resource.",
     },
     {
-      title: "Why Choose GrowthPanel?",
-      text: "GrowthPanel is your ultimate destination for top-notch SMM panel services: organic services, guaranteed services, campaign ad management and 24/7 support. We focus on result-oriented services that have a lasting impact, whichever platform you're scaling.",
+      title: "Why Choose Intopsmm?",
+      text: "Intopsmm is your ultimate destination for top-notch SMM panel services: organic services, guaranteed services, campaign ad management and 24/7 support. We focus on result-oriented services that have a lasting impact, whichever platform you're scaling.",
     },
     {
       title: "SMM Services Insight",
-      text: "Our commitment to excellence: our team of experts has the experience and knowledge to deliver top-quality SMM panel services at the most competitive prices. Proceed with confidence knowing GrowthPanel has your social media marketing needs covered.",
+      text: "Our commitment to excellence: our team of experts has the experience and knowledge to deliver top-quality SMM panel services at the most competitive prices. Proceed with confidence knowing Intopsmm has your social media marketing needs covered.",
     },
   ];
   return (
@@ -459,43 +459,43 @@ function BestSelling() {
     {
       Icon: InstagramLogo,
       name: "Instagram Services",
-      text: "Boost your Instagram with GrowthPanel's top-tier, reliable and affordable SMM services.",
+      text: "Boost your Instagram with Intopsmm's top-tier, reliable and affordable SMM services.",
       iconClass: "bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600",
     },
     {
       Icon: TikTokLogo,
       name: "TikTok Services",
-      text: "Elevate your TikTok presence with GrowthPanel's expert and cost-effective SMM services.",
+      text: "Elevate your TikTok presence with Intopsmm's expert and cost-effective SMM services.",
       iconClass: "bg-black",
     },
     {
       Icon: YouTubeLogo,
       name: "YouTube Services",
-      text: "Enhance your YouTube channel with GrowthPanel's efficient and budget-friendly services.",
+      text: "Enhance your YouTube channel with Intopsmm's efficient and budget-friendly services.",
       iconClass: "bg-[#FF0000]",
     },
     {
       Icon: FacebookLogo,
       name: "Facebook Services",
-      text: "Grow your Facebook with GrowthPanel's expert, affordable and effective services.",
+      text: "Grow your Facebook with Intopsmm's expert, affordable and effective services.",
       iconClass: "bg-[#1877F2]",
     },
     {
       Icon: SpotifyLogo,
       name: "Spotify Services",
-      text: "Amplify your Spotify presence with GrowthPanel's affordable and powerful services.",
+      text: "Amplify your Spotify presence with Intopsmm's affordable and powerful services.",
       iconClass: "bg-[#1DB954]",
     },
     {
       Icon: DiscordLogo,
       name: "Discord Services",
-      text: "Secure your Discord server with GrowthPanel's expert and budget-friendly services.",
+      text: "Secure your Discord server with Intopsmm's expert and budget-friendly services.",
       iconClass: "bg-[#5865F2]",
     },
     {
       Icon: XLogo,
       name: "Twitter Services",
-      text: "Supercharge your Twitter growth with GrowthPanel's unique, impactful services.",
+      text: "Supercharge your Twitter growth with Intopsmm's unique, impactful services.",
       iconClass: "bg-black",
     },
     {
@@ -508,7 +508,7 @@ function BestSelling() {
   return (
     <section id="services" className="px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <SectionHeading highlight="GrowthPanel" after=" Best Selling Services" />
+        <SectionHeading highlight="Intopsmm" after=" Best Selling Services" />
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {services.map(({ Icon, name, text, iconClass }) => (
             <Card key={name} className="glass flex flex-col border-border/60 p-6 shadow-card">
@@ -546,7 +546,7 @@ function NumbersCard() {
     <section className="px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <Card className="border-border/60 bg-[image:var(--gradient-primary)] p-8 text-primary-foreground shadow-glow sm:p-12">
-          <h2 className="text-3xl font-extrabold">GrowthPanel by the Numbers</h2>
+          <h2 className="text-3xl font-extrabold">Intopsmm by the Numbers</h2>
           <p className="mt-3 max-w-3xl text-sm opacity-90">
             We are proud to serve over 70 million active clients worldwide with more than 8,000
             active services. Our clients trust us for our commitment to quality and affordability,
@@ -589,7 +589,7 @@ function VsOthers() {
   return (
     <section className="bg-secondary/40 px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <SectionHeading before="GrowthPanel vs " highlight="Others" />
+        <SectionHeading before="Intopsmm vs " highlight="Others" />
         <div className="mt-10 space-y-3">
           {rows.map(({ Icon, text }) => (
             <Card
@@ -607,7 +607,7 @@ function VsOthers() {
               </div>
               <div className="flex items-center gap-8 sm:ml-auto">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold">GrowthPanel</span>
+                  <span className="text-sm font-bold">Intopsmm</span>
                   <Check className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex items-center gap-2">
@@ -629,7 +629,7 @@ function Clientele() {
   return (
     <section className="px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <SectionHeading highlight="GrowthPanel" after=" leading the SMM industry for over 5 years!" />
+        <SectionHeading highlight="Intopsmm" after=" leading the SMM industry for over 5 years!" />
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           {brands.map((b) => (
             <span
@@ -651,7 +651,7 @@ function Steps() {
   const steps = [
     {
       title: "Register Account",
-      text: "Sign up with your email, set a strong password and verify your account to get started with GrowthPanel.",
+      text: "Sign up with your email, set a strong password and verify your account to get started with Intopsmm.",
     },
     {
       title: "Choose Service",
@@ -667,7 +667,7 @@ function Steps() {
       <div className="mx-auto max-w-7xl">
         <SectionHeading
           before="Start your social media empire with "
-          highlight="GrowthPanel"
+          highlight="Intopsmm"
           sub="You need just 3 steps and you will see the magic. So why are you waiting?"
         />
         <div className="mt-10 grid gap-6 md:grid-cols-3">
@@ -693,12 +693,12 @@ function Steps() {
 function Testimonials() {
   const rowA = [
     {
-      text: "GrowthPanel has truly changed the game for me! Their services are reliable and super affordable. My Instagram has seen real growth in just a few weeks.",
+      text: "Intopsmm has truly changed the game for me! Their services are reliable and super affordable. My Instagram has seen real growth in just a few weeks.",
       name: "Deepak Sharma",
       role: "Social Media Manager at TechMinds, Mumbai",
     },
     {
-      text: "The ease of use and effectiveness of GrowthPanel is amazing. My YouTube channel has grown significantly since I started using their services.",
+      text: "The ease of use and effectiveness of Intopsmm is amazing. My YouTube channel has grown significantly since I started using their services.",
       name: "Rohit Mehta",
       role: "Small Business Owner",
     },
@@ -720,7 +720,7 @@ function Testimonials() {
       role: "E-commerce Entrepreneur",
     },
     {
-      text: "I was struggling to get engagement on my Facebook page, but GrowthPanel turned that around. Their 24/7 support is fantastic.",
+      text: "I was struggling to get engagement on my Facebook page, but Intopsmm turned that around. Their 24/7 support is fantastic.",
       name: "Priya R.",
       role: "Influencer",
     },
@@ -730,7 +730,7 @@ function Testimonials() {
       role: "Social Media Manager",
     },
     {
-      text: "I love how easy it is to use GrowthPanel. The platform is straightforward and my Twitter engagement has skyrocketed.",
+      text: "I love how easy it is to use Intopsmm. The platform is straightforward and my Twitter engagement has skyrocketed.",
       name: "David Lee",
       role: "Social Media Strategist at TrendSetters, Los Angeles",
     },
@@ -763,7 +763,7 @@ function Testimonials() {
       <div className="mx-auto max-w-7xl">
         <SectionHeading
           before="What clients say about "
-          highlight="GrowthPanel"
+          highlight="Intopsmm"
           after="!"
           sub="These are some things our clients have to say about our work."
         />
@@ -780,7 +780,7 @@ function Testimonials() {
 function FeatureSplits() {
   const blocks = [
     {
-      sub: "Upgrade your social media presence with GrowthPanel's top-rated services!",
+      sub: "Upgrade your social media presence with Intopsmm's top-rated services!",
       before: "Skyrocket ",
       highlight: "Your Followers",
       after: " Count Instantly 🚀",
@@ -942,7 +942,7 @@ function FAQSection() {
         <SectionHeading
           before="Frequently Asked Questions "
           highlight="(FAQ)"
-          sub="These are the most commonly asked questions about GrowthPanel."
+          sub="These are the most commonly asked questions about Intopsmm."
         />
         <div className="mt-8 flex flex-wrap justify-center gap-2">
           {(Object.keys(faqTabs) as FaqTab[]).map((t) => (
@@ -989,7 +989,7 @@ function CTASection() {
         <Card className="border-border/60 bg-[image:var(--gradient-primary)] p-10 text-center text-primary-foreground shadow-glow sm:p-14">
           <h2 className="text-3xl font-extrabold sm:text-4xl">Register Now and Get High Bonus!</h2>
           <p className="mx-auto mt-4 max-w-3xl text-sm opacity-90">
-            Enhance your social media presence with GrowthPanel services. Sign up now to access a
+            Enhance your social media presence with Intopsmm services. Sign up now to access a
             wide range of tools designed to boost your online visibility and engagement. Join us and
             watch your social media accounts thrive!
           </p>
@@ -1031,7 +1031,7 @@ function Footer() {
               <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground">
                 <TrendingUp className="h-5 w-5" />
               </span>
-              <span className="text-lg font-bold">GrowthPanel</span>
+              <span className="text-lg font-bold">Intopsmm</span>
             </div>
             <p className="mt-4 max-w-sm text-sm text-muted-foreground">
               The fastest, most secure and fully automated SMM panel for creators, agencies and
@@ -1072,10 +1072,10 @@ function Footer() {
         </div>
         <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-border/60 pt-8 sm:flex-row sm:items-center">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} GrowthPanel. All rights reserved.
+            © {new Date().getFullYear()} Intopsmm. All rights reserved.
           </p>
           <p className="text-xs text-muted-foreground">
-            Made with growth in mind — hello@growthpanel.io
+            Made with Intopsmm in mind — hello@intopsmm.io
           </p>
         </div>
       </div>

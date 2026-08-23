@@ -29,13 +29,13 @@ import {
 export const Route = createFileRoute("/_authenticated/admin/services")({
   head: () => ({
     meta: [
-      { title: "Service Catalog & Pricing | GrowthPanel Admin" },
+      { title: "Service Catalog & Pricing | Intopsmm Admin" },
       {
         name: "description",
         content:
           "Import supplier services, apply percentage or fixed markup, and publish sellable SMM services priced in Indian Rupees.",
       },
-      { property: "og:title", content: "Service Catalog & Pricing | GrowthPanel Admin" },
+      { property: "og:title", content: "Service Catalog & Pricing | Intopsmm Admin" },
       {
         property: "og:description",
         content: "Import supplier services and control markup pricing in INR.",

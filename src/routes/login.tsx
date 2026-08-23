@@ -30,9 +30,9 @@ export const Route = createFileRoute("/login")({
   }),
   head: () => ({
     meta: [
-      { title: "Log in — GrowthPanel" },
-      { name: "description", content: "Log in to your GrowthPanel account to manage orders, wallet and campaigns." },
-      { property: "og:title", content: "Log in — GrowthPanel" },
+      { title: "Log in — Intopsmm" },
+      { name: "description", content: "Log in to your Intopsmm account to manage orders, wallet and campaigns." },
+      { property: "og:title", content: "Log in — Intopsmm" },
       { property: "og:description", content: "Access your SMM dashboard." },
     ],
   }),
@@ -89,7 +89,7 @@ function LoginPage() {
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
               <TrendingUp className="h-5 w-5" />
             </span>
-            <span className="text-lg font-bold">GrowthPanel</span>
+            <span className="text-lg font-bold">Intopsmm</span>
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -213,7 +213,7 @@ export function BrandingPane() {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} GrowthPanel — Automate your growth.
+          © {new Date().getFullYear()} Intopsmm — Automate your growth.
         </p>
       </div>
     </div>
