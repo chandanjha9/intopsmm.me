@@ -63,49 +63,20 @@ export async function createTopupSession(userId: string, amount: number): Promis
 
   const gatewayOrderId = String(order.id);
 
-  // 2. Try to create dynamic Razorpay QR Code if available, or generate standard UPI QR
-  let qrDataUrl = "";
-  let upiIntentUrl = "";
-
-  try {
-    const qrRes = await razorpayFetch("/payments/qr_codes", {
-      method: "POST",
-      body: JSON.stringify({
-        type: "upi_qr",
-        name: "GrowMeSMM Wallet",
-        usage: "single_use",
-        fixed_amount: true,
-        payment_amount: Math.round(amount * 100),
-        description: `Wallet Topup ₹${amount}`,
-        close_by: Math.floor(expiresAt / 1000),
-        notes: { user_id: userId, gateway_order_id: gatewayOrderId, purpose: "wallet_topup" },
-      }),
-    });
-
-    if (qrRes && qrRes.image_url) {
-      qrDataUrl = qrRes.image_url;
-    }
-  } catch (qrErr) {
-    // If QR code API is not enabled on account, fallback to Razorpay standard payment link or UPI payload
-    console.warn("[razorpay] qr_codes API fallback:", qrErr instanceof Error ? qrErr.message : qrErr);
-  }
-
-  // If no direct image URL returned by Razorpay API, generate QR data URL
-  if (!qrDataUrl) {
-    // Standard UPI URI format compatible with GPay, PhonePe, Paytm, BHIM
-    // Note: If merchant VPA is configured or standard Razorpay checkout intent
-    const vpa = process.env.UPI_VPA || "merchant@razorpay";
-    upiIntentUrl = `upi://pay?pa=${vpa}&pn=GrowMeSMM&am=${amount.toFixed(2)}&cu=INR&tr=${gatewayOrderId}&tn=WalletTopup`;
-    qrDataUrl = await QRCode.toDataURL(upiIntentUrl, {
-      errorCorrectionLevel: "H",
-      margin: 2,
-      width: 400,
-      color: {
-        dark: "#000000",
-        light: "#FFFFFF",
-      },
-    });
-  }
+  // 2. Generate valid UPI QR Code compatible with PhonePe, GPay, Paytm, BHIM
+  const vpa = process.env.UPI_VPA || "chandanjha45@ybl";
+  const name = process.env.UPI_NAME || "GrowMeSMM";
+  const upiIntentUrl = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(name)}&am=${amount.toFixed(2)}&cu=INR&tr=${gatewayOrderId}&tn=${encodeURIComponent(`Wallet Topup ${amount}`)}`;
+  
+  const qrDataUrl = await QRCode.toDataURL(upiIntentUrl, {
+    errorCorrectionLevel: "H",
+    margin: 2,
+    width: 400,
+    color: {
+      dark: "#000000",
+      light: "#FFFFFF",
+    },
+  });
 
   // 3. Record in database
   const result = await db

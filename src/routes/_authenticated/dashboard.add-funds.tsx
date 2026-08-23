@@ -14,10 +14,15 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  Download,
   QrCode,
   CreditCard,
-  Sparkles,
+  Clock,
   RefreshCw,
+  Sparkles,
+  ExternalLink,
+  Copy,
+  Check,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { checkWalletTopup, createWalletTopup, listMyTopups } from "@/lib/payments.functions";
@@ -30,10 +35,10 @@ export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
       {
         name: "description",
         content:
-          "Scan the verified UPI QR code and top up your wallet instantly in INR.",
+          "Scan the 5-minute dynamic UPI QR code with your entered amount and top up your wallet instantly in INR.",
       },
       { property: "og:title", content: "Top Up Wallet — GrowthPanel" },
-      { property: "og:description", content: "Enter an amount, scan the QR and pay with any UPI app." },
+      { property: "og:description", content: "Enter an amount, scan the 5-min QR and pay with any UPI app." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
@@ -46,28 +51,23 @@ const QUICK_AMOUNTS = [1, 10, 100, 250, 500, 1000];
 const MIN_AMOUNT = 1;
 const MAX_AMOUNT = 200000;
 
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-  }
-}
-
-function loadRazorpay(): Promise<boolean> {
-  if (typeof window === "undefined") return Promise.resolve(false);
-  if (window.Razorpay) return Promise.resolve(true);
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
+type ActiveQRSession = {
+  paymentOrderId: string;
+  gatewayOrderId: string;
+  amount: number;
+  qrDataUrl: string;
+  upiIntentUrl?: string;
+  expiresAt: number;
+};
 
 function AddFundsPage() {
   const [amount, setAmount] = useState("1");
   const [agreed, setAgreed] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [activeSession, setActiveSession] = useState<ActiveQRSession | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(false);
 
   const queryClient = useQueryClient();
   const fetchTopups = useServerFn(listMyTopups);
@@ -85,62 +85,87 @@ function AddFundsPage() {
       : "";
 
   const amountReady = !amountError && amt >= MIN_AMOUNT;
-  const canPay = amountReady && agreed && !isProcessing;
+  const canGenerate = amountReady && agreed && !isGenerating;
 
-  // Open Official Razorpay Checkout with Verified UPI QR Code
-  const handlePayNow = async () => {
-    if (!canPay) return;
-    setIsProcessing(true);
+  // Handle countdown timer for active QR
+  useEffect(() => {
+    if (!activeSession || paymentSuccess) return;
+
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((activeSession.expiresAt - Date.now()) / 1000));
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeSession, paymentSuccess]);
+
+  // Poll for payment completion when QR session is active
+  useEffect(() => {
+    if (!activeSession || paymentSuccess || timeLeft <= 0) return;
+
+    const pollTimer = setInterval(async () => {
+      try {
+        const res = await checkTopup({ data: { paymentOrderId: activeSession.paymentOrderId } });
+        if (res.status === "paid") {
+          setPaymentSuccess(true);
+          toast.success(`🎉 Payment of ₹${fmt.format(activeSession.amount)} received successfully! Added to wallet.`);
+          await queryClient.invalidateQueries();
+          clearInterval(pollTimer);
+        }
+      } catch {
+        // Continue polling
+      }
+    }, 2500);
+
+    return () => clearInterval(pollTimer);
+  }, [activeSession, paymentSuccess, timeLeft, checkTopup, queryClient, fmt]);
+
+  // Generate dynamic QR code
+  const handleGenerateQR = async () => {
+    if (!canGenerate) return;
+    setIsGenerating(true);
+    setPaymentSuccess(false);
 
     try {
-      const ready = await loadRazorpay();
-      if (!ready || !window.Razorpay) {
-        throw new Error("Could not load payment gateway. Please check your internet connection.");
-      }
-
-      // Create order on backend
       const session = await startTopup({ data: { amount: amt } });
-
-      const checkout = new window.Razorpay({
-        key: session.keyId,
-        amount: Math.round(session.amount * 100),
-        currency: "INR",
-        name: "GrowMeSMM",
-        description: `Wallet Top-Up ₹${session.amount}`,
-        order_id: session.gatewayOrderId,
-        theme: { color: "#10B981" },
-        modal: {
-          ondismiss: () => {
-            setIsProcessing(false);
-          },
-        },
-        handler: async () => {
-          toast.loading("Payment received! Verifying and crediting wallet...");
-          // Poll for automatic DB confirmation
-          for (let i = 0; i < 12; i += 1) {
-            await new Promise((r) => setTimeout(r, 2000));
-            try {
-              const status = await checkTopup({ data: { paymentOrderId: session.paymentOrderId } });
-              if (status.status === "paid") {
-                toast.dismiss();
-                toast.success(`🎉 ₹${fmt.format(session.amount)} added to your wallet successfully!`);
-                break;
-              }
-            } catch {
-              /* retry */
-            }
-          }
-          await queryClient.invalidateQueries();
-          setIsProcessing(false);
-        },
-      });
-
-      checkout.open();
+      setActiveSession(session);
+      setTimeLeft(Math.max(0, Math.floor((session.expiresAt - Date.now()) / 1000)));
+      toast.success(`Dynamic QR generated for ₹${fmt.format(amt)}. Valid for 5 minutes.`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to open payment gateway");
-      setIsProcessing(false);
+      toast.error(err instanceof Error ? err.message : "Failed to generate QR code");
+    } finally {
+      setIsGenerating(false);
     }
   };
+
+  // Download QR code image
+  const handleDownloadQR = () => {
+    if (!activeSession?.qrDataUrl) return;
+    const link = document.createElement("a");
+    link.href = activeSession.qrDataUrl;
+    link.download = `GrowMeSMM-QR-₹${activeSession.amount}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.info("QR Code downloaded! Open PhonePe/GPay/Paytm to scan from gallery.");
+  };
+
+  // Copy UPI Intent link
+  const handleCopyUPI = () => {
+    if (!activeSession?.upiIntentUrl) return;
+    navigator.clipboard.writeText(activeSession.upiIntentUrl);
+    setCopiedUpi(true);
+    setTimeout(() => setCopiedUpi(false), 2000);
+    toast.success("UPI link copied!");
+  };
+
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  const timeFormatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
   return (
     <DashboardShell active="Add Funds">
@@ -149,13 +174,14 @@ function AddFundsPage() {
         <div className="grid gap-4 p-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="min-w-0">
             <span className="inline-flex rounded-full bg-emerald-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-400">
-              Verified UPI &amp; Cards Gateway
+              5-Minute Dynamic UPI QR
             </span>
             <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
               TOP UP <span className="gradient-text">WALLET</span>
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Instant auto-credit via PhonePe, Google Pay, Paytm, UPI QR, Cards &amp; Netbanking.
+              Enter the amount, generate a 5-minute dynamic UPI QR code, scan with any UPI app, and get credited
+              instantly.
             </p>
           </div>
           <span className="hidden h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-lg sm:grid">
@@ -165,14 +191,14 @@ function AddFundsPage() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-12">
-        {/* Left Column: Payment Form */}
+        {/* Left Column: Top-Up Controls & Dynamic QR */}
         <div className="space-y-6 lg:col-span-7">
           <Card className="glass border-border/60 p-6 shadow-card">
             <div className="space-y-5">
               {/* Amount Selection */}
               <div className="space-y-2">
                 <Label htmlFor="amount" className="text-sm font-semibold">
-                  Enter Amount to Add (₹{MIN_AMOUNT} – ₹{fmt.format(MAX_AMOUNT)})
+                  Amount to Add (₹{MIN_AMOUNT} – ₹{fmt.format(MAX_AMOUNT)})
                 </Label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground">
@@ -212,83 +238,178 @@ function AddFundsPage() {
               <label className="flex cursor-pointer items-start gap-2.5 text-xs text-muted-foreground">
                 <Checkbox checked={agreed} onCheckedChange={(v) => setAgreed(v === true)} className="mt-0.5" />
                 <span>
-                  I understand funds added will be used for orders and no fraudulent chargebacks will be initiated.
+                  I agree that funds added will be used for SMM services and I will not raise fraudulent disputes.
                 </span>
               </label>
 
-              {/* Big CTA: Pay via UPI QR / Apps */}
+              {/* Generate QR Button */}
               <Button
                 variant="hero"
                 className="h-14 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-base font-bold shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-teal-700"
-                disabled={!canPay}
-                onClick={handlePayNow}
+                disabled={!canGenerate}
+                onClick={handleGenerateQR}
               >
-                {isProcessing ? (
+                {isGenerating ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Opening UPI QR Gateway…
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating 5-Min Dynamic QR…
                   </>
                 ) : (
                   <>
                     <QrCode className="mr-2 h-5 w-5" />
-                    Scan &amp; Pay {amountReady ? `₹${fmt.format(amt)}` : ""} (UPI QR / Cards)
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    Generate Dynamic QR Code ({amountReady ? `₹${fmt.format(amt)}` : ""})
                   </>
                 )}
               </Button>
 
-              {/* Badges / Support */}
-              <div className="grid grid-cols-3 gap-2 pt-2 text-center">
-                <div className="rounded-xl border border-border/40 bg-secondary/20 p-2.5">
-                  <p className="text-[11px] font-bold text-foreground">PhonePe &amp; GPay</p>
-                  <p className="text-[9px] text-muted-foreground">Direct App / QR</p>
+              {/* Active Dynamic QR Display Card */}
+              {activeSession && (
+                <div className="overflow-hidden rounded-2xl border border-emerald-500/30 bg-emerald-950/10 p-5 shadow-inner">
+                  {paymentSuccess ? (
+                    /* Success State */
+                    <div className="py-8 text-center">
+                      <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+                        <CheckCircle2 className="h-10 w-10 animate-bounce" />
+                      </div>
+                      <h3 className="text-xl font-bold text-emerald-400">Payment Successful! 🎉</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        ₹{fmt.format(activeSession.amount)} has been credited to your wallet instantly.
+                      </p>
+                      <Button
+                        onClick={() => {
+                          setActiveSession(null);
+                          setPaymentSuccess(false);
+                        }}
+                        className="mt-4 rounded-xl bg-emerald-500 font-semibold text-white hover:bg-emerald-600"
+                      >
+                        Add More Funds
+                      </Button>
+                    </div>
+                  ) : timeLeft <= 0 ? (
+                    /* Expired State */
+                    <div className="py-6 text-center">
+                      <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/20 text-destructive">
+                        <XCircle className="h-8 w-8" />
+                      </div>
+                      <h3 className="text-lg font-bold text-destructive">QR Code Expired</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        This 5-minute QR code has expired for security. Please generate a new one.
+                      </p>
+                      <Button
+                        onClick={handleGenerateQR}
+                        className="mt-3 rounded-xl bg-primary text-primary-foreground"
+                      >
+                        <RefreshCw className="mr-1.5 h-4 w-4" /> Generate New QR
+                      </Button>
+                    </div>
+                  ) : (
+                    /* Active 5-Minute QR State */
+                    <div className="text-center">
+                      {/* Timer Badge */}
+                      <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-sm font-bold text-emerald-400">
+                        <Clock className="h-4 w-4 animate-spin text-emerald-400" />
+                        Expires in: <span className="font-mono text-base">{timeFormatted}</span>
+                      </div>
+
+                      {/* QR Image Box */}
+                      <div className="mx-auto my-4 flex aspect-square w-full max-w-[240px] items-center justify-center rounded-2xl border-2 border-emerald-500/40 bg-white p-3 shadow-2xl">
+                        <img
+                          src={activeSession.qrDataUrl}
+                          alt={`UPI QR for ₹${activeSession.amount}`}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+
+                      {/* Amount Details */}
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Pay Exact Amount
+                        </p>
+                        <p className="text-2xl font-black text-foreground">₹{fmt.format(activeSession.amount)}</p>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="mt-4 grid grid-cols-2 gap-2.5">
+                        <Button
+                          variant="outline"
+                          onClick={handleDownloadQR}
+                          className="h-11 rounded-xl border-border/80 text-xs font-bold"
+                        >
+                          <Download className="mr-1.5 h-4 w-4" /> Download QR
+                        </Button>
+                        {activeSession.upiIntentUrl ? (
+                          <Button
+                            asChild
+                            className="h-11 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700"
+                          >
+                            <a href={activeSession.upiIntentUrl}>
+                              <ExternalLink className="mr-1.5 h-4 w-4" /> Pay via App
+                            </a>
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            onClick={handleCopyUPI}
+                            className="h-11 rounded-xl border-border/80 text-xs font-bold"
+                          >
+                            {copiedUpi ? <Check className="mr-1.5 h-4 w-4 text-emerald-400" /> : <Copy className="mr-1.5 h-4 w-4" />}
+                            {copiedUpi ? "Copied!" : "Copy Link"}
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Live Polling Status */}
+                      <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-secondary/30 py-2 text-xs font-medium text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                        Waiting for payment... Auto-updates instantly
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="rounded-xl border border-border/40 bg-secondary/20 p-2.5">
-                  <p className="text-[11px] font-bold text-foreground">Paytm &amp; BHIM</p>
-                  <p className="text-[9px] text-muted-foreground">Instant Scan</p>
-                </div>
-                <div className="rounded-xl border border-border/40 bg-secondary/20 p-2.5">
-                  <p className="text-[11px] font-bold text-foreground">Cards &amp; NetBanking</p>
-                  <p className="text-[9px] text-muted-foreground">All Major Banks</p>
-                </div>
-              </div>
+              )}
             </div>
           </Card>
         </div>
 
-        {/* Right Column: Passbook & Info */}
+        {/* Right Column: Passbook & Payment Guide */}
         <div className="space-y-6 lg:col-span-5">
-          {/* Guide */}
+          {/* Instructions */}
           <Card className="glass border-border/60 p-5 shadow-card">
             <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              <Sparkles className="h-4 w-4 text-emerald-400" /> How Payment Works
+              <Sparkles className="h-4 w-4 text-emerald-400" /> How 5-Min Dynamic QR Works
             </h3>
             <ol className="mt-3 space-y-2.5 text-xs text-muted-foreground">
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
                   1
                 </span>
-                <span>Enter amount and click <strong>Scan &amp; Pay</strong>.</span>
+                <span>Enter amount and click <strong>Generate Dynamic QR</strong>.</span>
               </li>
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
                   2
                 </span>
-                <span>Scan the verified <strong>UPI QR code</strong> with PhonePe, Google Pay, Paytm, or BHIM.</span>
+                <span>Open GPay, PhonePe, Paytm or BHIM UPI and scan the QR code (or download to scan from gallery).</span>
               </li>
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
                   3
                 </span>
-                <span>Payment is verified and your wallet is <strong>instantly credited</strong>!</span>
+                <span>Complete the payment within <strong>5 minutes</strong>.</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
+                  4
+                </span>
+                <span>Your wallet balance updates <strong>automatically without refreshing</strong>.</span>
               </li>
             </ol>
             <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-500/10 p-3 text-[11px] font-medium text-emerald-400">
               <ShieldCheck className="h-4 w-4 shrink-0" />
-              100% Secure Razorpay encrypted official banking gateway.
+              Direct 256-bit encrypted UPI instant payment gateway.
             </div>
           </Card>
 
-          {/* Passbook History */}
+          {/* Top-up History Passbook */}
           <Card className="glass border-border/60 p-5 shadow-card">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Recent Top-Ups</h2>
