@@ -62,10 +62,24 @@ function formatRawError(status: number, text: string): string {
 }
 
 function normalizeUrl(url: string): string {
-  let cleaned = url.trim();
+  let cleaned = url.trim().replace(/^[,;\s"']+|[,;\s"']+$/g, "");
   if (!cleaned.startsWith("http://") && !cleaned.startsWith("https://")) {
     cleaned = `https://${cleaned}`;
   }
+  // Remove trailing slashes
+  cleaned = cleaned.replace(/\/+$/, "");
+
+  // If user passed just domain (e.g. https://electrosmm.com), append /api/v2
+  try {
+    const parsed = new URL(cleaned);
+    if (!parsed.pathname || parsed.pathname === "/" || parsed.pathname === "") {
+      parsed.pathname = "/api/v2";
+      cleaned = parsed.toString().replace(/\/+$/, "");
+    }
+  } catch {
+    // Ignore URL parse error
+  }
+
   return cleaned;
 }
 
