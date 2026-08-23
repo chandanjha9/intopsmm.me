@@ -120,12 +120,26 @@ function DashboardPage() {
 
   const { data: allServices = [], isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
-    queryFn: () => fetchServices() as Promise<Service[]>,
+    queryFn: async () => {
+      try {
+        const res = await fetchServices();
+        return Array.isArray(res) ? (res as Service[]) : [];
+      } catch {
+        return [];
+      }
+    },
     staleTime: 60_000,
   });
   const { data: myOrders = [] } = useQuery({
     queryKey: ["my-orders"],
-    queryFn: () => fetchOrders(),
+    queryFn: async () => {
+      try {
+        const res = await fetchOrders();
+        return Array.isArray(res) ? res : [];
+      } catch {
+        return [];
+      }
+    },
     staleTime: 30_000,
   });
 
@@ -135,24 +149,23 @@ function DashboardPage() {
   const [quantity, setQuantity] = useState("1000");
   const [link, setLink] = useState("");
 
-  const platformServices = useMemo(
-    () =>
-      platform === "All"
-        ? allServices
-        : allServices.filter((item) =>
-            (item.platform ?? item.category ?? "").toLowerCase().includes(platform.toLowerCase()),
-          ),
-    [allServices, platform],
-  );
+  const platformServices = useMemo(() => {
+    const list = Array.isArray(allServices) ? allServices : [];
+    return platform === "All"
+      ? list
+      : list.filter((item) =>
+          (item?.platform ?? item?.category ?? "").toLowerCase().includes(platform.toLowerCase()),
+        );
+  }, [allServices, platform]);
 
   const categories = useMemo(
-    () => Array.from(new Set(platformServices.map((item) => item.category ?? "Other"))),
+    () => Array.from(new Set(platformServices.map((item) => item?.category ?? "Other"))),
     [platformServices],
   );
 
   const activeCategory = categories.includes(category) ? category : (categories[0] ?? "");
   const categoryServices = useMemo(
-    () => platformServices.filter((item) => (item.category ?? "Other") === activeCategory),
+    () => platformServices.filter((item) => (item?.category ?? "Other") === activeCategory),
     [platformServices, activeCategory],
   );
   const service =

@@ -1,3 +1,6 @@
+import sql from "mssql";
+import { poolConnect } from "@/integrations/sqlServer/client";
+
 const RAZORPAY_API = "https://api.razorpay.com/v1";
 
 function credentials() {
@@ -35,10 +38,10 @@ export type TopupSession = {
   keyId: string;
 };
 
-/** Creates a Razorpay order and records it locally so the webhook can credit the wallet. */
+/** Creates a Razorpay order and records it locally in SQL Server so the webhook can credit the wallet. */
 export async function createTopupSession(userId: string, amount: number): Promise<TopupSession> {
   const { keyId } = credentials();
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const db = await poolConnect;
 
   const receipt = `wallet_${Date.now()}_${userId.slice(0, 8)}`;
   const order = await razorpayFetch("/orders", {
@@ -51,22 +54,24 @@ export async function createTopupSession(userId: string, amount: number): Promis
     }),
   });
 
-  const { data, error } = await supabaseAdmin
-    .from("payment_orders")
-    .insert({
-      user_id: userId,
-      gateway: "razorpay",
-      gateway_order_id: String(order.id),
-      amount,
-      currency: "INR",
-      status: "created",
-    })
-    .select("id")
-    .single();
-  if (error) throw new Error(error.message);
+  const result = await db
+    .request()
+    .input("userId", sql.UniqueIdentifier, userId)
+    .input("gateway", sql.NVarChar, "razorpay")
+    .input("gatewayOrderId", sql.NVarChar, String(order.id))
+    .input("amount", sql.Decimal(18, 4), amount)
+    .input("currency", sql.NVarChar, "INR")
+    .input("status", sql.NVarChar, "created")
+    .query(`
+      INSERT INTO payment_orders (user_id, gateway, gateway_order_id, amount, currency, status)
+      OUTPUT INSERTED.id
+      VALUES (@userId, @gateway, @gatewayOrderId, @amount, @currency, @status)
+    `);
+
+  const paymentOrderId = result.recordset[0]?.id;
 
   return {
-    paymentOrderId: data.id,
+    paymentOrderId,
     gatewayOrderId: String(order.id),
     amount,
     keyId,
@@ -74,12 +79,13 @@ export async function createTopupSession(userId: string, amount: number): Promis
 }
 
 export async function getTopupStatus(userId: string, paymentOrderId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
-    .from("payment_orders")
-    .select("id, user_id, status, amount, error_message")
-    .eq("id", paymentOrderId)
-    .maybeSingle();
+  const db = await poolConnect;
+  const result = await db
+    .request()
+    .input("id", sql.UniqueIdentifier, paymentOrderId)
+    .query("SELECT id, user_id, status, amount, error_message FROM payment_orders WHERE id = @id");
+
+  const data = result.recordset[0];
   if (!data || data.user_id !== userId) throw new Error("Payment not found");
   return { status: data.status, amount: Number(data.amount), error: data.error_message };
 }
@@ -108,7 +114,7 @@ function timingSafeEqual(a: string, b: string) {
   return diff === 0;
 }
 
-/** Verifies the Razorpay webhook signature and credits the wallet exactly once. */
+/** Verifies the Razorpay webhook signature and credits the wallet atomically using SQL Server Stored Procedure. */
 export async function handleRazorpayWebhook(rawBody: string, signature: string | null) {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!secret) return new Response("Webhook not configured", { status: 503 });
@@ -136,29 +142,39 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string |
   const payment = event.payload?.payment?.entity;
   if (!payment?.order_id) return new Response("ok");
 
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const db = await poolConnect;
 
   if (event.event === "payment.captured" || event.event === "order.paid") {
-    const { error } = await supabaseAdmin.rpc("credit_wallet_from_payment", {
-      _gateway: "razorpay",
-      _gateway_order_id: payment.order_id,
-      _gateway_payment_id: payment.id ?? "",
-      _amount: Number(payment.amount ?? 0) / 100,
-    });
-    if (error) {
-      console.error("[razorpay] credit failed:", error.message);
+    try {
+      await db
+        .request()
+        .input("gateway", sql.NVarChar, "razorpay")
+        .input("gatewayOrderId", sql.NVarChar, payment.order_id)
+        .input("gatewayPaymentId", sql.NVarChar, payment.id ?? "")
+        .input("amount", sql.Decimal(18, 4), Number(payment.amount ?? 0) / 100)
+        .output("success", sql.Bit)
+        .execute("sp_credit_wallet_from_payment");
+
+      return new Response("ok");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Credit failed";
+      console.error("[razorpay] credit failed:", message);
       return new Response("credit failed", { status: 500 });
     }
-    return new Response("ok");
   }
 
   if (event.event === "payment.failed") {
-    await supabaseAdmin
-      .from("payment_orders")
-      .update({ status: "failed", error_message: payment.error_description ?? "Payment failed" })
-      .eq("gateway", "razorpay")
-      .eq("gateway_order_id", payment.order_id)
-      .neq("status", "paid");
+    await db
+      .request()
+      .input("gateway", sql.NVarChar, "razorpay")
+      .input("gatewayOrderId", sql.NVarChar, payment.order_id)
+      .input("errorMessage", sql.NVarChar, payment.error_description ?? "Payment failed")
+      .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
+      .query(`
+        UPDATE payment_orders 
+        SET status = 'failed', error_message = @errorMessage, updated_at = @updatedAt 
+        WHERE gateway = @gateway AND gateway_order_id = @gatewayOrderId AND status <> 'paid'
+      `);
   }
 
   return new Response("ok");

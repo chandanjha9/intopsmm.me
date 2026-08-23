@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import sql from "mssql";
+import { poolConnect } from "@/integrations/sqlServer/client";
+import { requireAuth } from "./auth/auth-middleware";
 import { createTopupSession, getTopupStatus } from "./payments.server";
 
 const amountSchema = z.object({
@@ -10,23 +12,39 @@ const amountSchema = z.object({
 const statusSchema = z.object({ paymentOrderId: z.string().uuid() });
 
 export const createWalletTopup = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input: unknown) => amountSchema.parse(input))
   .handler(async ({ data, context }) => createTopupSession(context.userId, data.amount));
 
 export const checkWalletTopup = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input: unknown) => statusSchema.parse(input))
   .handler(async ({ data, context }) => getTopupStatus(context.userId, data.paymentOrderId));
 
 export const listMyTopups = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("payment_orders")
-      .select("id, amount, status, gateway_payment_id, created_at")
-      .order("created_at", { ascending: false })
-      .limit(30);
-    if (error) throw new Error(error.message);
-    return data ?? [];
+    const db = await poolConnect;
+    const result = await db
+      .request()
+      .input("userId", sql.UniqueIdentifier, context.userId)
+      .query(`
+        SELECT TOP 30
+          id,
+          amount,
+          status,
+          gateway_payment_id,
+          created_at
+        FROM payment_orders
+        WHERE user_id = @userId
+        ORDER BY created_at DESC
+      `);
+
+    return result.recordset.map((row) => ({
+      id: row.id,
+      amount: Number(row.amount),
+      status: row.status,
+      gateway_payment_id: row.gateway_payment_id,
+      created_at: row.created_at,
+    }));
   });

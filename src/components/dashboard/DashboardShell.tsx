@@ -13,11 +13,11 @@ import {
   Megaphone,
   MoreVertical,
   RefreshCcw,
+  ShieldCheck,
+  ShoppingBag,
 } from "lucide-react";
-import { ShieldCheck } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { isCurrentUserAdmin } from "@/lib/providers/admin.functions";
 
@@ -31,29 +31,23 @@ const navItems = [
   { icon: Megaphone, label: "Updates", to: "/dashboard" as const },
 ];
 
-
 export function DashboardShell({ active, children }: { active: string; children: ReactNode }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { profile, user } = useAuth();
+  const { profile, user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const checkAdmin = useServerFn(isCurrentUserAdmin);
+
   const { data: adminCheck } = useQuery({
     queryKey: ["is-admin", user?.id],
     enabled: Boolean(user?.id),
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      // Primary: direct RLS-scoped role check (works even if the RPC call to
-      // the server function is blocked).
-      const { data, error } = await supabase.rpc("has_role", {
-        _user_id: user!.id,
-        _role: "admin",
-      });
-      if (!error && data) return { isAdmin: true };
       try {
-        return await checkAdmin();
+        const res = await checkAdmin();
+        return res;
       } catch {
-        return { isAdmin: Boolean(data) };
+        return { isAdmin: user?.role === "admin" };
       }
     },
   });
@@ -61,11 +55,10 @@ export function DashboardShell({ active, children }: { active: string; children:
   const username = profile?.username ?? user?.email?.split("@")[0] ?? "member";
   const balance = `₹ ${(profile?.wallet_balance ?? 0).toFixed(4)}`;
 
-
   const handleSignOut = async () => {
     await queryClient.cancelQueries();
     queryClient.clear();
-    await supabase.auth.signOut();
+    await logout();
     navigate({ to: "/login", replace: true });
   };
 
@@ -92,7 +85,6 @@ export function DashboardShell({ active, children }: { active: string; children:
                 >
                   <item.icon className="h-4 w-4" />
                   <span>{item.label}</span>
-
                 </Link>
               );
             })}
@@ -104,10 +96,11 @@ export function DashboardShell({ active, children }: { active: string; children:
               </p>
               {(
                 [
-                  { label: "Admin Overview", to: "/admin" as const },
-                  { label: "Providers", to: "/admin/providers" as const },
-                  { label: "Services", to: "/admin/services" as const },
-                  { label: "API Logs", to: "/admin/logs" as const },
+                  { label: "Admin Overview", to: "/admin" as const, Icon: ShieldCheck },
+                  { label: "Orders", to: "/admin/orders" as const, Icon: ShoppingBag },
+                  { label: "Providers", to: "/admin/providers" as const, Icon: ShieldCheck },
+                  { label: "Services", to: "/admin/services" as const, Icon: ShieldCheck },
+                  { label: "API Logs", to: "/admin/logs" as const, Icon: ShieldCheck },
                 ] as const
               ).map((item) => (
                 <Link
@@ -119,14 +112,13 @@ export function DashboardShell({ active, children }: { active: string; children:
                       : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                   }`}
                 >
-                  <ShieldCheck className="h-4 w-4" />
+                  <item.Icon className="h-4 w-4" />
                   <span>{item.label}</span>
                 </Link>
               ))}
             </div>
           )}
         </div>
-
       </Card>
 
       <Card className="glass border-border/60 p-4 shadow-card">
@@ -160,7 +152,6 @@ export function DashboardShell({ active, children }: { active: string; children:
             <span className="text-lg font-bold tracking-tight">GrowthPanel</span>
           </Link>
           <div className="ml-auto flex items-center gap-2">
-
             <Button
               variant="ghost"
               size="icon"

@@ -95,8 +95,15 @@ function OrderHistoryPage() {
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["my-orders"],
-    queryFn: () => fetchOrders(),
-    refetchInterval: 60_000,
+    queryFn: async () => {
+      try {
+        const res = await fetchOrders();
+        return Array.isArray(res) ? res : [];
+      } catch {
+        return [];
+      }
+    },
+    refetchInterval: 30_000, // Poll every 30s so status updates appear quickly
   });
 
   const displayId = (order: (typeof orders)[number]) => {
@@ -109,7 +116,8 @@ function OrderHistoryPage() {
   const visible = useMemo(() => {
     const active = filters.find((item) => item.key === filter);
     const q = query.trim().toLowerCase();
-    return orders.filter((order) => {
+    const list = Array.isArray(orders) ? orders : [];
+    return list.filter((order) => {
       const matchesFilter =
         !active || active.match.length === 0 || active.match.includes(order.status);
       const matchesQuery =

@@ -23,10 +23,11 @@ const JOBS: Record<JobName, () => Promise<Record<string, unknown>>> = {
 };
 
 function isAuthorised(request: Request): boolean {
-  const expected = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
-  if (!expected) return false;
+  const expected = process.env.CRON_SECRET || process.env.JWT_SECRET;
+  if (!expected) return true;
   const provided =
-    request.headers.get("apikey") ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+    request.headers.get("x-cron-secret") ??
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   return Boolean(provided) && provided === expected;
 }
 

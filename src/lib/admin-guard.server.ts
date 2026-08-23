@@ -1,21 +1,21 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
+import { checkUserRole } from "@/lib/auth/service.server";
 
 /**
- * Verifies the caller is an admin using their own (RLS-scoped) client, then
- * hands back the service-role client for privileged work.
+ * Verifies the caller has the 'admin' role in SQL Server.
  */
-export async function requireAdmin(
-  userClient: SupabaseClient<Database>,
-  userId: string,
-): Promise<SupabaseClient<Database>> {
-  const { data, error } = await userClient.rpc("has_role", { _user_id: userId, _role: "admin" });
-  if (error) {
-    throw new Response("Unable to verify administrator access", { status: 403 });
+export async function requireAdmin(userId: string): Promise<void> {
+  if (!userId) {
+    throw new Response(JSON.stringify({ error: "Unauthorized: Please log in" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
   }
-  if (!data) {
-    throw new Response("Forbidden: administrator access required", { status: 403 });
+
+  const isAdmin = await checkUserRole(userId, "admin");
+  if (!isAdmin) {
+    throw new Response(JSON.stringify({ error: "Forbidden: Administrator access required" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
   }
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin as unknown as SupabaseClient<Database>;
 }

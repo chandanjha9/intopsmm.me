@@ -59,13 +59,21 @@ function TransactionsPage() {
 
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ["my-transactions"],
-    queryFn: () => fetchTransactions(),
+    queryFn: async () => {
+      try {
+        const res = await fetchTransactions();
+        return Array.isArray(res) ? res : [];
+      } catch {
+        return [];
+      }
+    },
     refetchInterval: 60_000,
   });
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return transactions.filter(
+    const list = Array.isArray(transactions) ? transactions : [];
+    return list.filter(
       (t) =>
         (filter === "All" || t.type === filter) &&
         (!q || t.id.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q)),
@@ -73,10 +81,11 @@ function TransactionsPage() {
   }, [transactions, filter, query]);
 
   const totals = useMemo(() => {
-    const credited = transactions
+    const list = Array.isArray(transactions) ? transactions : [];
+    const credited = list
       .filter((t) => t.type !== "debit")
       .reduce((sum, t) => sum + Number(t.amount), 0);
-    const debited = transactions
+    const debited = list
       .filter((t) => t.type === "debit")
       .reduce((sum, t) => sum + Number(t.amount), 0);
     return { credited, debited };

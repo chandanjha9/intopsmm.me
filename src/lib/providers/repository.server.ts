@@ -2,6 +2,8 @@ import { decryptSecret } from "./crypto.server";
 import { ElectroSmmProvider } from "./electrosmm.server";
 import type { HttpLogEntry } from "./http-client.server";
 import type { SmmProvider } from "./types";
+import { poolConnect } from "@/integrations/sqlServer/client";
+import sql from "mssql";
 
 type ProviderRow = {
   id: string;
@@ -15,22 +17,24 @@ type ProviderRow = {
 };
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
+  const db = await poolConnect;
+  return db;
 }
 
 export async function insertProviderLog(providerId: string | null, entry: HttpLogEntry): Promise<void> {
   const db = await admin();
-  await db.from("provider_logs").insert({
-    provider_id: providerId,
-    action: entry.action,
-    request_payload: entry.request as never,
-    response_payload: (entry.response ?? null) as never,
-    status_code: entry.statusCode,
-    duration_ms: entry.durationMs,
-    retry_count: entry.retryCount,
-    error_message: entry.error,
-  });
+  const query = `INSERT INTO provider_logs (provider_id, action, request_payload, response_payload, status_code, duration_ms, retry_count, error_message)
+                 VALUES (@providerId, @action, @request, @response, @statusCode, @durationMs, @retryCount, @errorMessage)`;
+  await db.request()
+    .input('providerId', sql.NVarChar, providerId)
+    .input('action', sql.NVarChar, entry.action)
+    .input('request', sql.NVarChar, JSON.stringify(entry.request))
+    .input('response', sql.NVarChar, entry.response ? JSON.stringify(entry.response) : null)
+    .input('statusCode', sql.Int, entry.statusCode)
+    .input('durationMs', sql.Int, entry.durationMs)
+    .input('retryCount', sql.Int, entry.retryCount)
+    .input('errorMessage', sql.NVarChar, entry.error ?? null)
+    .query(query);
 }
 
 export async function notifyAdmins(input: {
@@ -40,33 +44,33 @@ export async function notifyAdmins(input: {
   severity?: "info" | "warning" | "critical";
 }): Promise<void> {
   const db = await admin();
-  await db.from("admin_notifications").insert({
-    kind: input.kind,
-    title: input.title,
-    message: input.message ?? null,
-    severity: input.severity ?? "warning",
-  });
+  const query = `INSERT INTO admin_notifications (kind, title, message, severity)
+                 VALUES (@kind, @title, @message, @severity)`;
+  await db.request()
+    .input('kind', sql.NVarChar, input.kind)
+    .input('title', sql.NVarChar, input.title)
+    .input('message', sql.NVarChar, input.message ?? null)
+    .input('severity', sql.NVarChar, input.severity ?? "warning")
+    .query(query);
 }
 
 export async function getProviderRow(providerId: string): Promise<ProviderRow> {
   const db = await admin();
-  const { data, error } = await db.from("providers").select("*").eq("id", providerId).maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Provider not found");
-  return data as ProviderRow;
+  const query = `SELECT * FROM providers WHERE id = @id`;
+  const result = await db.request()
+    .input('id', sql.NVarChar, providerId)
+    .query(query);
+  const row = result.recordset[0];
+  if (!row) throw new Error("Provider not found");
+  return row as ProviderRow;
 }
 
 /** Highest-priority active provider, used when an order does not pin one. */
 export async function getPrimaryProviderRow(): Promise<ProviderRow> {
   const db = await admin();
-  const { data, error } = await db
-    .from("providers")
-    .select("*")
-    .eq("is_active", true)
-    .order("priority", { ascending: true })
-    .limit(1);
-  if (error) throw new Error(error.message);
-  const row = data?.[0];
+  const query = `SELECT TOP 1 * FROM providers WHERE is_active = 1 ORDER BY priority ASC`;
+  const result = await db.request().query(query);
+  const row = result.recordset[0];
   if (!row) throw new Error("No active provider is configured");
   return row as ProviderRow;
 }
@@ -97,10 +101,12 @@ export async function getProviderClient(providerId?: string | null): Promise<{
 
 export async function markProviderHealth(providerId: string, error: string | null): Promise<void> {
   const db = await admin();
-  await db
-    .from("providers")
-    .update({ last_error: error, last_checked_at: new Date().toISOString() })
-    .eq("id", providerId);
+  const query = `UPDATE providers SET last_error = @error, last_checked_at = @checkedAt WHERE id = @id`;
+  await db.request()
+    .input('id', sql.NVarChar, providerId)
+    .input('error', sql.NVarChar, error)
+    .input('checkedAt', sql.NVarChar, new Date().toISOString())
+    .query(query);
   if (error) {
     await notifyAdmins({
       kind: "provider_offline",

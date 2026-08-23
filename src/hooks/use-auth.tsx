@@ -1,89 +1,124 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { loginServerFn, registerServerFn, logoutServerFn, getMeServerFn } from "@/lib/auth/auth.functions";
+import type { UserProfile } from "@/lib/auth/service.server";
 
-export type Profile = {
+export type Profile = UserProfile;
+
+export type AuthUser = {
   id: string;
-  username: string | null;
-  full_name: string | null;
-  avatar_url: string | null;
-  wallet_balance: number;
+  email: string;
+  role?: string;
+  user_metadata?: {
+    username?: string;
+    full_name?: string;
+    is_admin?: boolean;
+  };
 };
 
 type AuthContextValue = {
-  session: Session | null;
-  user: User | null;
+  session: { user: AuthUser } | null;
+  user: AuthUser | null;
   profile: Profile | null;
   loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, username?: string, fullName?: string) => Promise<void>;
+  logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = async (user: User) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username, full_name, avatar_url, wallet_balance")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (data) {
-      setProfile(data as Profile);
-      return;
+  const loadCurrentAuth = async () => {
+    try {
+      const res = await getMeServerFn();
+      if (res?.profile) {
+        setProfile(res.profile);
+        setUser({
+          id: res.profile.id,
+          email: res.profile.email,
+          role: res.profile.role,
+          user_metadata: {
+            username: res.profile.username ?? undefined,
+            full_name: res.profile.full_name ?? undefined,
+            is_admin: res.profile.role === "admin",
+          },
+        });
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+    } catch {
+      setUser(null);
+      setProfile(null);
+    } finally {
+      setLoading(false);
     }
-
-    // No profile row yet (e.g. first Google sign-in). Create it from the
-    // identity the provider returned so wallet/orders have somewhere to live.
-    const meta = (user.user_metadata ?? {}) as Record<string, string | undefined>;
-    const emailLocal = (user.email ?? "user").split("@")[0];
-    const { data: created } = await supabase
-      .from("profiles")
-      .insert({
-        id: user.id,
-        username: meta.username ?? `${emailLocal}_${user.id.slice(0, 6)}`,
-        full_name: meta.full_name ?? meta.name ?? null,
-        avatar_url: meta.avatar_url ?? meta.picture ?? null,
-      })
-      .select("id, username, full_name, avatar_url, wallet_balance")
-      .maybeSingle();
-
-    setProfile((created as Profile | null) ?? null);
   };
 
-
   useEffect(() => {
-    // Register the listener before the initial read so no event is missed.
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      if (nextSession?.user) void loadProfile(nextSession.user);
-      else setProfile(null);
-    });
-
-    void supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (data.session?.user) void loadProfile(data.session.user);
-      setLoading(false);
-    });
-
-    return () => sub.subscription.unsubscribe();
+    void loadCurrentAuth();
   }, []);
+
+  const login = async (email: string, password: string) => {
+    const result = await loginServerFn({ data: { email, password } });
+    if (result?.profile) {
+      setProfile(result.profile);
+      setUser({
+        id: result.profile.id,
+        email: result.profile.email,
+        role: result.profile.role,
+        user_metadata: {
+          username: result.profile.username ?? undefined,
+          full_name: result.profile.full_name ?? undefined,
+          is_admin: result.profile.role === "admin",
+        },
+      });
+    }
+  };
+
+  const register = async (email: string, password: string, username?: string, fullName?: string) => {
+    const result = await registerServerFn({ data: { email, password, username, fullName } });
+    if (result?.profile) {
+      setProfile(result.profile);
+      setUser({
+        id: result.profile.id,
+        email: result.profile.email,
+        role: result.profile.role,
+        user_metadata: {
+          username: result.profile.username ?? undefined,
+          full_name: result.profile.full_name ?? undefined,
+          is_admin: result.profile.role === "admin",
+        },
+      });
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await logoutServerFn();
+    } finally {
+      setUser(null);
+      setProfile(null);
+    }
+  };
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      session,
-      user: session?.user ?? null,
+      session: user ? { user } : null,
+      user,
       profile,
       loading,
-      refreshProfile: async () => {
-        if (session?.user) await loadProfile(session.user);
-      },
+      login,
+      register,
+      logout,
+      refreshProfile: loadCurrentAuth,
     }),
-    [session, profile, loading],
+    [user, profile, loading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

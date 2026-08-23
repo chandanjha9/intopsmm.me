@@ -70,17 +70,38 @@ function RefillPage() {
   const submitRefill = useServerFn(refillOrder);
   const [query, setQuery] = useState("");
 
-  const ordersQuery = useQuery({ queryKey: ["my-orders"], queryFn: () => fetchOrders() });
-  const refillsQuery = useQuery({ queryKey: ["my-refills"], queryFn: () => fetchRefills() });
+  const ordersQuery = useQuery({
+    queryKey: ["my-orders"],
+    queryFn: async () => {
+      try {
+        const res = await fetchOrders();
+        return Array.isArray(res) ? res : [];
+      } catch {
+        return [];
+      }
+    },
+  });
+  const refillsQuery = useQuery({
+    queryKey: ["my-refills"],
+    queryFn: async () => {
+      try {
+        const res = await fetchRefills();
+        return Array.isArray(res) ? res : [];
+      } catch {
+        return [];
+      }
+    },
+  });
 
-  const refills = refillsQuery.data ?? [];
+  const refills = Array.isArray(refillsQuery.data) ? refillsQuery.data : [];
   const requestedOrderIds = useMemo(
     () => new Set(refills.filter((r) => r.status !== "failed").map((r) => r.order_id)),
     [refills],
   );
 
   const eligible = useMemo(() => {
-    const rows = (ordersQuery.data ?? []).filter((order) => {
+    const list = Array.isArray(ordersQuery.data) ? ordersQuery.data : [];
+    const rows = list.filter((order) => {
       if (order.status !== "completed") return false;
       const service = Array.isArray(order.services) ? order.services[0] : order.services;
       return Boolean(service?.refill_supported);

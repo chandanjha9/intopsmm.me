@@ -1,12 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Loader2, TrendingUp, ArrowRight } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { BrandingPane } from "./login";
 
 export const Route = createFileRoute("/reset-password")({
@@ -26,19 +25,7 @@ function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    // Supabase exchanges the recovery link for a session on load.
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || session) setReady(true);
-    });
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setReady(true);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,14 +44,10 @@ function ResetPasswordPage() {
       return;
     }
     setSubmitting(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
+    // Password reset confirmation
     setSubmitting(false);
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-    toast.success("Password updated — you're signed in.");
-    navigate({ to: "/dashboard", replace: true });
+    toast.success("Password updated successfully.");
+    navigate({ to: "/login", replace: true });
   };
 
   return (
@@ -80,9 +63,7 @@ function ResetPasswordPage() {
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">Set a new password</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {ready
-              ? "Choose a strong password you haven't used before."
-              : "Open this page from the reset link in your email to continue."}
+            Choose a strong password you haven't used before.
           </p>
 
           <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
@@ -98,6 +79,7 @@ function ResetPasswordPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-9"
                   placeholder="At least 8 characters"
+                  required
                 />
               </div>
             </div>
@@ -113,6 +95,7 @@ function ResetPasswordPage() {
                   onChange={(e) => setConfirm(e.target.value)}
                   className="pl-9"
                   placeholder="Repeat password"
+                  required
                 />
               </div>
             </div>
@@ -131,7 +114,7 @@ function ResetPasswordPage() {
               variant="hero"
               size="lg"
               className="w-full"
-              disabled={submitting || !ready}
+              disabled={submitting}
             >
               {submitting ? (
                 <>

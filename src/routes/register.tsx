@@ -15,13 +15,9 @@ import {
   ArrowLeft,
   Check,
   Loader2,
-  MailCheck,
 } from "lucide-react";
-import { BrandingPane, GoogleMark } from "./login";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import { BrandingPane } from "./login";
 import { useAuth } from "@/hooks/use-auth";
-import { signInWithFirebaseGoogleAndSupabase } from "@/lib/firebaseAuth";
 
 const signUpSchema = z.object({
   username: z
@@ -52,17 +48,15 @@ function passwordScore(pw: string) {
   if (/[A-Z]/.test(pw)) s++;
   if (/[0-9]/.test(pw)) s++;
   if (/[^A-Za-z0-9]/.test(pw)) s++;
-  return s; // 0..4
+  return s;
 }
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const { session, loading } = useAuth();
+  const { session, loading, register } = useAuth();
   const [step, setStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -76,19 +70,6 @@ function RegisterPage() {
     if (!loading && session) navigate({ to: "/dashboard", replace: true });
   }, [loading, session, navigate]);
 
-  const handleGoogle = async () => {
-    setError(null);
-    setGoogleLoading(true);
-    try {
-      await signInWithFirebaseGoogleAndSupabase();
-      navigate({ to: "/dashboard", replace: true });
-    } catch (err: any) {
-      setError(err?.message ?? "Google sign-up failed. Please try again.");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
   const handleSignUp = async () => {
     setError(null);
     const parsed = signUpSchema.safeParse({ username, email, password });
@@ -97,29 +78,16 @@ function RegisterPage() {
       return;
     }
     setSubmitting(true);
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: parsed.data.email,
-      password: parsed.data.password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: { username: parsed.data.username, full_name: parsed.data.username },
-      },
-    });
-    setSubmitting(false);
-    if (signUpError) {
-      setError(
-        signUpError.message.toLowerCase().includes("already registered")
-          ? "That email already has an account — try logging in."
-          : signUpError.message,
-      );
-      return;
-    }
-    if (data.session) {
+    try {
+      await register(parsed.data.email, parsed.data.password, parsed.data.username);
       toast.success("Account created!");
       navigate({ to: "/dashboard", replace: true });
-      return;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to register account";
+      setError(msg);
+    } finally {
+      setSubmitting(false);
     }
-    setEmailSent(true);
   };
 
   const strengthLabel = ["Too weak", "Weak", "Okay", "Strong", "Excellent"][score];
@@ -130,31 +98,6 @@ function RegisterPage() {
     "bg-primary",
     "bg-primary",
   ][score];
-
-  if (emailSent) {
-    return (
-      <div className="grid min-h-screen lg:grid-cols-2">
-        <BrandingPane />
-        <div className="flex items-center justify-center bg-background px-6 py-12">
-          <div className="w-full max-w-md text-center">
-            <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
-              <MailCheck className="h-6 w-6" />
-            </span>
-            <h1 className="mt-6 text-3xl font-bold tracking-tight">Confirm your email</h1>
-            <p className="mt-3 text-sm text-muted-foreground">
-              We sent a confirmation link to <span className="font-medium text-foreground">{email}</span>.
-              Click it to activate your account, then log in.
-            </p>
-            <Link to="/login" className="mt-8 inline-block">
-              <Button variant="hero" size="lg">
-                Go to login <ArrowRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
@@ -219,6 +162,7 @@ function RegisterPage() {
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="growth_hero"
                       className="pl-9"
+                      required
                     />
                   </div>
                   {username && (
@@ -242,6 +186,7 @@ function RegisterPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@growth.io"
                       className="pl-9"
+                      required
                     />
                   </div>
                   {email && (
@@ -269,6 +214,7 @@ function RegisterPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="At least 8 characters"
                     className="pl-9"
+                    required
                   />
                 </div>
                 <div className="mt-2 flex gap-1.5">
@@ -376,31 +322,6 @@ function RegisterPage() {
               </Button>
             </div>
           </form>
-
-          {step === 1 && (
-            <>
-              <div className="my-6 flex items-center gap-3">
-                <span className="h-px flex-1 bg-border" />
-                <span className="text-xs uppercase tracking-widest text-muted-foreground">or</span>
-                <span className="h-px flex-1 bg-border" />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="w-full"
-                onClick={handleGoogle}
-                disabled={googleLoading}
-              >
-                {googleLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <GoogleMark className="mr-2 h-4 w-4" />
-                )}
-                Sign up with Google
-              </Button>
-            </>
-          )}
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{" "}

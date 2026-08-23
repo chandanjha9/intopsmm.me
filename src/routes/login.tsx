@@ -16,15 +16,7 @@ import {
   ShieldCheck,
   Loader2,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/hooks/use-auth";
-import { signInWithFirebaseAndSupabase, signInWithFirebaseGoogleAndSupabase } from "@/lib/firebaseAuth";
-
-const credentialsSchema = z.object({
-  email: z.string().trim().email({ message: "Enter a valid email address" }).max(255),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }).max(72),
-});
 
 function safePath(value: unknown): string {
   return typeof value === "string" && value.startsWith("/") && !value.startsWith("//")
@@ -50,12 +42,11 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const { redirect } = Route.useSearch();
-  const { session, loading } = useAuth();
+  const { session, loading, login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
 
   const destination = safePath(redirect);
 
@@ -66,77 +57,27 @@ function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const parsed = credentialsSchema.safeParse({ email, password });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0].message);
-      return;
-    }
-    setSubmitting(true);
-    const { error: signInError } = await supabase.auth.signInWithPassword(parsed.data);
-    setSubmitting(false);
-    if (signInError) {
-      setError(
-        signInError.message === "Invalid login credentials"
-          ? "Incorrect email or password."
-          : signInError.message,
-      );
-      return;
-    }
-    toast.success("Welcome back!");
-    navigate({ to: destination, replace: true });
-  };
 
-  const handleFirebaseSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    const parsed = credentialsSchema.safeParse({ email, password });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0].message);
+    const loginEmail = email.trim();
+    const loginPassword = password;
+
+    if (!loginEmail || !loginPassword) {
+      setError("Please enter both email and password.");
       return;
     }
+
     setSubmitting(true);
+
     try {
-      await signInWithFirebaseAndSupabase(email, password);
+      await login(loginEmail, loginPassword);
       toast.success("Welcome back!");
       navigate({ to: destination, replace: true });
-    } catch (err: any) {
-      setError(err?.message ?? "Login failed.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to log in";
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleGoogle = async () => {
-    setError(null);
-    setGoogleLoading(true);
-    if (typeof window !== "undefined") {
-      window.sessionStorage.setItem("gp_post_login", destination);
-    }
-    try {
-      await signInWithFirebaseGoogleAndSupabase();
-      toast.success("Welcome back!");
-      navigate({ to: destination, replace: true });
-    } catch (err: any) {
-      setError(err?.message ?? "Google sign-in failed. Please try again.");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    const parsed = z.string().trim().email().safeParse(email);
-    if (!parsed.success) {
-      setError("Enter your email above first, then click Forgot password.");
-      return;
-    }
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(parsed.data, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (resetError) {
-      setError(resetError.message);
-      return;
-    }
-    toast.success("Password reset link sent — check your inbox.");
   };
 
   return (
@@ -168,19 +109,13 @@ function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@growth.io"
                   className="pl-9"
+                  required
                 />
               </div>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  className="text-xs font-medium text-primary hover:underline"
-                >
-                  Forgot password?
-                </button>
               </div>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -192,6 +127,7 @@ function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   className="pl-9"
+                  required
                 />
               </div>
             </div>
@@ -216,49 +152,10 @@ function LoginPage() {
                 </>
               )}
             </Button>
-            {/* Firebase Email/Password button */}
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              className="w-full"
-              onClick={handleFirebaseSubmit}
-              disabled={submitting}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-1 h-4 w-4 animate-spin" /> Signing in…
-                </>
-              ) : (
-                <>Sign in with Email (Firebase)</>
-              )}
-            </Button>
           </form>
 
-          <div className="my-6 flex items-center gap-3">
-            <span className="h-px flex-1 bg-border" />
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">or</span>
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="w-full"
-            onClick={handleGoogle}
-            disabled={googleLoading}
-          >
-            {googleLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <GoogleMark className="mr-2 h-4 w-4" />
-            )}
-            Continue with Google
-          </Button>
-
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Don't have an account?{' '}
+            Don't have an account?{" "}
             <Link to="/register" className="font-semibold text-primary hover:underline">
               Create one
             </Link>

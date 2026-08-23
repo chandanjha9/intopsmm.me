@@ -1,68 +1,114 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
+import sql from "mssql";
+import { poolConnect } from "@/integrations/sqlServer/client";
 import { encryptSecret } from "./crypto.server";
 import { buildProvider, getProviderRow, markProviderHealth } from "./repository.server";
 import { calculateSellingRate } from "./pricing";
 import type { MarkupType, ProviderSummary } from "./types";
 
-type Db = SupabaseClient<Database>;
+export async function fetchProviders(): Promise<ProviderSummary[]> {
+  const db = await poolConnect;
+  const result = await db.request().query(`
+    SELECT 
+      id, name, api_url, priority, is_active, timeout_ms, currency, 
+      last_balance, last_balance_at, last_error, last_checked_at, 
+      api_key_encrypted, created_at, updated_at
+    FROM providers
+    ORDER BY priority ASC
+  `);
 
-const PROVIDER_COLUMNS =
-  "id, name, api_url, priority, is_active, timeout_ms, currency, last_balance, last_balance_at, last_error, last_checked_at, api_key_encrypted, created_at, updated_at";
-
-export async function fetchProviders(db: Db): Promise<ProviderSummary[]> {
-  const { data, error } = await db.from("providers").select(PROVIDER_COLUMNS).order("priority");
-  if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => {
+  return result.recordset.map((row) => {
     const { api_key_encrypted, ...rest } = row;
-    return { ...rest, has_api_key: Boolean(api_key_encrypted) } as ProviderSummary;
+    return {
+      ...rest,
+      last_balance: row.last_balance !== null ? Number(row.last_balance) : null,
+      is_active: Boolean(row.is_active),
+      has_api_key: Boolean(api_key_encrypted),
+    } as ProviderSummary;
   });
 }
 
-export async function saveProvider(
-  db: Db,
-  input: {
-    id?: string;
-    name: string;
-    apiUrl: string;
-    apiKey?: string;
-    priority: number;
-    isActive: boolean;
-    timeoutMs: number;
-    currency: string;
-  },
-): Promise<{ id: string }> {
-  const base = {
-    name: input.name,
-    api_url: input.apiUrl,
-    priority: input.priority,
-    is_active: input.isActive,
-    timeout_ms: input.timeoutMs,
-    currency: input.currency,
-  };
+export async function saveProvider(input: {
+  id?: string;
+  name: string;
+  apiUrl: string;
+  apiKey?: string;
+  priority: number;
+  isActive: boolean;
+  timeoutMs: number;
+  currency: string;
+}): Promise<{ id: string }> {
+  const db = await poolConnect;
 
   if (input.id) {
-    const payload = input.apiKey
-      ? { ...base, api_key_encrypted: await encryptSecret(input.apiKey) }
-      : base;
-    const { error } = await db.from("providers").update(payload).eq("id", input.id);
-    if (error) throw new Error(error.message);
+    if (input.apiKey) {
+      const encrypted = await encryptSecret(input.apiKey);
+      await db
+        .request()
+        .input("id", sql.UniqueIdentifier, input.id)
+        .input("name", sql.NVarChar, input.name)
+        .input("apiUrl", sql.NVarChar, input.apiUrl)
+        .input("apiKeyEncrypted", sql.NVarChar, encrypted)
+        .input("priority", sql.Int, input.priority)
+        .input("isActive", sql.Bit, input.isActive)
+        .input("timeoutMs", sql.Int, input.timeoutMs)
+        .input("currency", sql.NVarChar, input.currency)
+        .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
+        .query(`
+          UPDATE providers 
+          SET name = @name, api_url = @apiUrl, api_key_encrypted = @apiKeyEncrypted, 
+              priority = @priority, is_active = @isActive, timeout_ms = @timeoutMs, 
+              currency = @currency, updated_at = @updatedAt
+          WHERE id = @id
+        `);
+    } else {
+      await db
+        .request()
+        .input("id", sql.UniqueIdentifier, input.id)
+        .input("name", sql.NVarChar, input.name)
+        .input("apiUrl", sql.NVarChar, input.apiUrl)
+        .input("priority", sql.Int, input.priority)
+        .input("isActive", sql.Bit, input.isActive)
+        .input("timeoutMs", sql.Int, input.timeoutMs)
+        .input("currency", sql.NVarChar, input.currency)
+        .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
+        .query(`
+          UPDATE providers 
+          SET name = @name, api_url = @apiUrl, priority = @priority, 
+              is_active = @isActive, timeout_ms = @timeoutMs, 
+              currency = @currency, updated_at = @updatedAt
+          WHERE id = @id
+        `);
+    }
     return { id: input.id };
   }
 
   if (!input.apiKey) throw new Error("An API key is required for a new provider");
-  const { data, error } = await db
-    .from("providers")
-    .insert({ ...base, api_key_encrypted: await encryptSecret(input.apiKey) })
-    .select("id")
-    .single();
-  if (error) throw new Error(error.message);
-  return { id: data.id };
+  const encrypted = await encryptSecret(input.apiKey);
+
+  const result = await db
+    .request()
+    .input("name", sql.NVarChar, input.name)
+    .input("apiUrl", sql.NVarChar, input.apiUrl)
+    .input("apiKeyEncrypted", sql.NVarChar, encrypted)
+    .input("priority", sql.Int, input.priority)
+    .input("isActive", sql.Bit, input.isActive)
+    .input("timeoutMs", sql.Int, input.timeoutMs)
+    .input("currency", sql.NVarChar, input.currency)
+    .query(`
+      INSERT INTO providers (name, api_url, api_key_encrypted, priority, is_active, timeout_ms, currency)
+      OUTPUT INSERTED.id
+      VALUES (@name, @apiUrl, @apiKeyEncrypted, @priority, @isActive, @timeoutMs, @currency)
+    `);
+
+  return { id: result.recordset[0].id };
 }
 
-export async function removeProvider(db: Db, id: string): Promise<void> {
-  const { error } = await db.from("providers").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+export async function removeProvider(id: string): Promise<void> {
+  const db = await poolConnect;
+  await db
+    .request()
+    .input("id", sql.UniqueIdentifier, id)
+    .query("DELETE FROM providers WHERE id = @id");
 }
 
 export async function testProviderConnection(
@@ -73,16 +119,23 @@ export async function testProviderConnection(
     const client = await buildProvider(row);
     const balance = await client.getBalance();
     await markProviderHealth(id, null);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin
-      .from("providers")
-      .update({
-        last_balance: Number(balance.balance) || 0,
-        last_balance_at: new Date().toISOString(),
-        currency: balance.currency,
-      })
-      .eq("id", id);
-    return { ok: true, balance: Number(balance.balance) || 0, currency: balance.currency };
+
+    const db = await poolConnect;
+    const balNum = Number(balance.balance) || 0;
+
+    await db
+      .request()
+      .input("id", sql.UniqueIdentifier, id)
+      .input("lastBalance", sql.Decimal(18, 4), balNum)
+      .input("lastBalanceAt", sql.DateTimeOffset, new Date().toISOString())
+      .input("currency", sql.NVarChar, balance.currency)
+      .query(`
+        UPDATE providers 
+        SET last_balance = @lastBalance, last_balance_at = @lastBalanceAt, currency = @currency 
+        WHERE id = @id
+      `);
+
+    return { ok: true, balance: balNum, currency: balance.currency };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Connection failed";
     await markProviderHealth(id, message);
@@ -90,127 +143,213 @@ export async function testProviderConnection(
   }
 }
 
-export async function fetchProviderCatalog(
-  db: Db,
-  input: { providerId?: string; search?: string; limit: number },
-) {
-  let query = db
-    .from("provider_services")
-    .select(
-      "id, provider_id, provider_service_id, name, category, type, rate, min_quantity, max_quantity, refill_supported, cancel_supported, is_available",
-    )
-    .order("category")
-    .limit(input.limit);
-  if (input.providerId) query = query.eq("provider_id", input.providerId);
-  if (input.search) query = query.ilike("name", `%${input.search}%`);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data ?? [];
+export async function fetchProviderCatalog(input: { providerId?: string; search?: string; limit: number }) {
+  const db = await poolConnect;
+  const request = db.request();
+
+  let query = `
+    SELECT TOP (@limit)
+      id, provider_id, provider_service_id, name, category, type, rate, 
+      min_quantity, max_quantity, refill_supported, cancel_supported, is_available
+    FROM provider_services
+    WHERE 1 = 1
+  `;
+
+  request.input("limit", sql.Int, input.limit || 100);
+
+  if (input.providerId) {
+    query += " AND provider_id = @providerId";
+    request.input("providerId", sql.UniqueIdentifier, input.providerId);
+  }
+
+  if (input.search) {
+    query += " AND name LIKE @search";
+    request.input("search", sql.NVarChar, `%${input.search}%`);
+  }
+
+  query += " ORDER BY category ASC, name ASC";
+
+  const result = await request.query(query);
+  return result.recordset.map((row) => ({
+    ...row,
+    rate: Number(row.rate),
+    refill_supported: Boolean(row.refill_supported),
+    cancel_supported: Boolean(row.cancel_supported),
+    is_available: Boolean(row.is_available),
+  }));
 }
 
-export async function fetchInternalServices(db: Db) {
-  const { data, error } = await db
-    .from("services")
-    .select(
-      "id, provider_id, provider_service_id, name, category, platform, markup_type, markup_value, selling_rate, min_quantity, max_quantity, refill_supported, cancel_supported, is_active",
-    )
-    .order("category")
-    .order("name");
-  if (error) throw new Error(error.message);
-  return data ?? [];
+export async function fetchInternalServices() {
+  const db = await poolConnect;
+  const result = await db.request().query(`
+    SELECT 
+      id, provider_id, provider_service_id, name, category, platform, 
+      markup_type, markup_value, selling_rate, min_quantity, max_quantity, 
+      refill_supported, cancel_supported, is_active
+    FROM services
+    ORDER BY category ASC, name ASC
+  `);
+
+  return result.recordset.map((row) => ({
+    ...row,
+    markup_value: Number(row.markup_value),
+    selling_rate: Number(row.selling_rate),
+    refill_supported: Boolean(row.refill_supported),
+    cancel_supported: Boolean(row.cancel_supported),
+    is_active: Boolean(row.is_active),
+  }));
 }
 
-export async function saveInternalService(
-  db: Db,
-  input: {
-    id?: string;
-    providerId: string;
-    providerServiceId: string;
-    name: string;
-    category: string;
-    platform: string;
-    description?: string;
-    markupType: MarkupType;
-    markupValue: number;
-    isActive: boolean;
-  },
-): Promise<{ id: string; sellingRate: number }> {
-  const { data: source, error: sourceError } = await db
-    .from("provider_services")
-    .select("rate, min_quantity, max_quantity, refill_supported, cancel_supported")
-    .eq("provider_id", input.providerId)
-    .eq("provider_service_id", input.providerServiceId)
-    .maybeSingle();
-  if (sourceError) throw new Error(sourceError.message);
+export async function saveInternalService(input: {
+  id?: string;
+  providerId: string;
+  providerServiceId: string;
+  name: string;
+  category: string;
+  platform: string;
+  description?: string;
+  markupType: MarkupType;
+  markupValue: number;
+  isActive: boolean;
+}): Promise<{ id: string; sellingRate: number }> {
+  const db = await poolConnect;
+
+  const sourceResult = await db
+    .request()
+    .input("providerId", sql.UniqueIdentifier, input.providerId)
+    .input("providerServiceId", sql.NVarChar, input.providerServiceId)
+    .query(`
+      SELECT rate, min_quantity, max_quantity, refill_supported, cancel_supported
+      FROM provider_services
+      WHERE provider_id = @providerId AND provider_service_id = @providerServiceId
+    `);
+
+  const source = sourceResult.recordset[0];
   if (!source) throw new Error("Provider service not found — import the catalog first");
 
   const sellingRate = calculateSellingRate(Number(source.rate), input.markupType, input.markupValue);
-  const payload = {
-    provider_id: input.providerId,
-    provider_service_id: input.providerServiceId,
-    name: input.name,
-    category: input.category,
-    platform: input.platform,
-    description: input.description ?? null,
-    markup_type: input.markupType,
-    markup_value: input.markupValue,
-    selling_rate: sellingRate,
-    min_quantity: source.min_quantity,
-    max_quantity: source.max_quantity,
-    refill_supported: source.refill_supported,
-    cancel_supported: source.cancel_supported,
-    is_active: input.isActive,
-  };
 
   if (input.id) {
-    const { error } = await db.from("services").update(payload).eq("id", input.id);
-    if (error) throw new Error(error.message);
+    await db
+      .request()
+      .input("id", sql.UniqueIdentifier, input.id)
+      .input("providerId", sql.UniqueIdentifier, input.providerId)
+      .input("providerServiceId", sql.NVarChar, input.providerServiceId)
+      .input("name", sql.NVarChar, input.name)
+      .input("category", sql.NVarChar, input.category)
+      .input("platform", sql.NVarChar, input.platform)
+      .input("description", sql.NVarChar, input.description ?? null)
+      .input("markupType", sql.NVarChar, input.markupType)
+      .input("markupValue", sql.Decimal(18, 4), input.markupValue)
+      .input("sellingRate", sql.Decimal(18, 4), sellingRate)
+      .input("minQuantity", sql.Int, source.min_quantity)
+      .input("maxQuantity", sql.Int, source.max_quantity)
+      .input("refillSupported", sql.Bit, source.refill_supported)
+      .input("cancelSupported", sql.Bit, source.cancel_supported)
+      .input("isActive", sql.Bit, input.isActive)
+      .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
+      .query(`
+        UPDATE services 
+        SET provider_id = @providerId, provider_service_id = @providerServiceId, name = @name, 
+            category = @category, platform = @platform, description = @description, 
+            markup_type = @markupType, markup_value = @markupValue, selling_rate = @sellingRate, 
+            min_quantity = @minQuantity, max_quantity = @maxQuantity, 
+            refill_supported = @refillSupported, cancel_supported = @cancelSupported, 
+            is_active = @isActive, updated_at = @updatedAt
+        WHERE id = @id
+      `);
     return { id: input.id, sellingRate };
   }
-  const { data, error } = await db.from("services").insert(payload).select("id").single();
-  if (error) throw new Error(error.message);
-  return { id: data.id, sellingRate };
+
+  const insertResult = await db
+    .request()
+    .input("providerId", sql.UniqueIdentifier, input.providerId)
+    .input("providerServiceId", sql.NVarChar, input.providerServiceId)
+    .input("name", sql.NVarChar, input.name)
+    .input("category", sql.NVarChar, input.category)
+    .input("platform", sql.NVarChar, input.platform)
+    .input("description", sql.NVarChar, input.description ?? null)
+    .input("markupType", sql.NVarChar, input.markupType)
+    .input("markupValue", sql.Decimal(18, 4), input.markupValue)
+    .input("sellingRate", sql.Decimal(18, 4), sellingRate)
+    .input("minQuantity", sql.Int, source.min_quantity)
+    .input("maxQuantity", sql.Int, source.max_quantity)
+    .input("refillSupported", sql.Bit, source.refill_supported)
+    .input("cancelSupported", sql.Bit, source.cancel_supported)
+    .input("isActive", sql.Bit, input.isActive)
+    .query(`
+      INSERT INTO services (
+        provider_id, provider_service_id, name, category, platform, description, 
+        markup_type, markup_value, selling_rate, min_quantity, max_quantity, 
+        refill_supported, cancel_supported, is_active
+      )
+      OUTPUT INSERTED.id
+      VALUES (
+        @providerId, @providerServiceId, @name, @category, @platform, @description, 
+        @markupType, @markupValue, @sellingRate, @minQuantity, @maxQuantity, 
+        @refillSupported, @cancelSupported, @isActive
+      )
+    `);
+
+  return { id: insertResult.recordset[0].id, sellingRate };
 }
 
-export async function removeInternalService(db: Db, id: string): Promise<void> {
-  const { error } = await db.from("services").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+export async function removeInternalService(id: string): Promise<void> {
+  const db = await poolConnect;
+  await db
+    .request()
+    .input("id", sql.UniqueIdentifier, id)
+    .query("DELETE FROM services WHERE id = @id");
 }
 
-export async function fetchApiLogs(db: Db, input: { action?: string; onlyErrors: boolean; limit: number }) {
-  let query = db
-    .from("provider_logs")
-    .select("id, provider_id, action, status_code, duration_ms, retry_count, error_message, request_payload, response_payload, created_at")
-    .order("created_at", { ascending: false })
-    .limit(input.limit);
-  if (input.action) query = query.eq("action", input.action);
-  if (input.onlyErrors) query = query.not("error_message", "is", null);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data ?? [];
+export async function fetchApiLogs(input: { action?: string; onlyErrors: boolean; limit: number }) {
+  const db = await poolConnect;
+  const request = db.request();
+
+  let query = `
+    SELECT TOP (@limit)
+      id, provider_id, action, status_code, duration_ms, retry_count, 
+      error_message, request_payload, response_payload, created_at
+    FROM provider_logs
+    WHERE 1 = 1
+  `;
+
+  request.input("limit", sql.Int, input.limit || 50);
+
+  if (input.action) {
+    query += " AND action = @action";
+    request.input("action", sql.NVarChar, input.action);
+  }
+
+  if (input.onlyErrors) {
+    query += " AND error_message IS NOT NULL";
+  }
+
+  query += " ORDER BY created_at DESC";
+
+  const result = await request.query(query);
+  return result.recordset;
 }
 
-export async function fetchAdminOverview(db: Db) {
-  const [providers, catalog, services, statuses, errors, cron, notifications] = await Promise.all([
-    fetchProviders(db),
-    db.from("provider_services").select("id", { count: "exact", head: true }).eq("is_available", true),
-    db.from("services").select("id", { count: "exact", head: true }).eq("is_active", true),
-    db.from("orders").select("status"),
-    db
-      .from("provider_logs")
-      .select("id", { count: "exact", head: true })
-      .not("error_message", "is", null)
-      .gte("created_at", new Date(Date.now() - 86400000).toISOString()),
-    db.from("cron_logs").select("job_name, status, created_at").order("created_at", { ascending: false }).limit(10),
-    db
-      .from("admin_notifications")
-      .select("id, kind, severity, title, message, is_read, created_at")
-      .order("created_at", { ascending: false })
-      .limit(20),
+export async function fetchAdminOverview() {
+  const db = await poolConnect;
+  const providers = await fetchProviders();
+
+  const [catalogRes, servicesRes, ordersRes, errorsRes, cronRes, notifRes] = await Promise.all([
+    db.request().query("SELECT COUNT(*) AS total FROM provider_services WHERE is_available = 1"),
+    db.request().query("SELECT COUNT(*) AS total FROM services WHERE is_active = 1"),
+    db.request().query("SELECT status FROM orders"),
+    db.request().query(`
+      SELECT COUNT(*) AS total 
+      FROM provider_logs 
+      WHERE error_message IS NOT NULL AND created_at >= DATEADD(DAY, -1, SYSDATETIMEOFFSET())
+    `),
+    db.request().query("SELECT TOP 10 job_name, status, created_at FROM cron_logs ORDER BY created_at DESC"),
+    db.request().query("SELECT TOP 20 id, kind, severity, title, message, is_read, created_at FROM admin_notifications ORDER BY created_at DESC"),
   ]);
 
   const counts = { pending: 0, in_progress: 0, completed: 0, failed: 0, total: 0 };
-  for (const row of statuses.data ?? []) {
+  for (const row of ordersRes.recordset) {
     counts.total += 1;
     if (row.status === "completed") counts.completed += 1;
     else if (["failed", "error", "canceled", "refunded"].includes(row.status)) counts.failed += 1;
@@ -222,13 +361,13 @@ export async function fetchAdminOverview(db: Db) {
 
   return {
     providers,
-    importedServices: catalog.count ?? 0,
-    internalServices: services.count ?? 0,
+    importedServices: catalogRes.recordset[0]?.total ?? 0,
+    internalServices: servicesRes.recordset[0]?.total ?? 0,
     orders: counts,
-    apiErrors24h: errors.count ?? 0,
-    cronRuns: cron.data ?? [],
-    notifications: notifications.data ?? [],
+    apiErrors24h: errorsRes.recordset[0]?.total ?? 0,
+    cronRuns: cronRes.recordset,
+    notifications: notifRes.recordset.map((n) => ({ ...n, is_read: Boolean(n.is_read) })),
     health: healthy ? "healthy" : providers.length === 0 ? "not_configured" : "degraded",
-    lastSyncAt: cron.data?.[0]?.created_at ?? null,
+    lastSyncAt: cronRes.recordset[0]?.created_at ?? null,
   };
 }
