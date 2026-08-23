@@ -51,14 +51,22 @@ function formatRawError(status: number, text: string): string {
   const trimmed = text.trim();
   if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html") || trimmed.includes("Cloudflare")) {
     if (status === 403) {
-      return "Provider returned 403 Forbidden (Cloudflare / Bot Protection). Please ensure the API URL is direct (e.g., https://domain.com/api/v2) and verify if the provider requires IP whitelisting.";
+      return "Provider responded 403 Forbidden (Cloudflare / Bot Protection). The provider panel is blocking cloud datacenter server requests. Please check if provider requires IP Whitelisting or allowlists.";
     }
     if (status === 404) {
-      return "Provider returned 404 Not Found. Please check that the API URL endpoint is correct (e.g., https://domain.com/api/v2).";
+      return "Provider responded 404 Not Found. Please check that the API URL endpoint is correct (e.g. https://domain.com/api/v2).";
     }
-    return `Provider returned an HTML page with HTTP status ${status}. Please verify the API URL endpoint.`;
+    return `Provider returned an HTML page with HTTP status ${status}.`;
   }
   return `Provider responded ${status}: ${text.slice(0, 200)}`;
+}
+
+function normalizeUrl(url: string): string {
+  let cleaned = url.trim();
+  if (!cleaned.startsWith("http://") && !cleaned.startsWith("https://")) {
+    cleaned = `https://${cleaned}`;
+  }
+  return cleaned;
 }
 
 /**
@@ -71,18 +79,45 @@ export class HttpClient {
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
   private readonly onLog?: HttpClientOptions["onLog"];
+  private readonly origin: string;
 
   constructor(options: HttpClientOptions) {
-    this.baseUrl = options.baseUrl;
+    this.baseUrl = normalizeUrl(options.baseUrl);
     this.timeoutMs = options.timeoutMs ?? 30000;
     this.maxRetries = options.maxRetries ?? 3;
     this.onLog = options.onLog;
+
+    try {
+      const parsed = new URL(this.baseUrl);
+      this.origin = parsed.origin;
+    } catch {
+      this.origin = "";
+    }
   }
 
   async postForm<T>(action: string, payload: Record<string, string | number>): Promise<T> {
     const started = Date.now();
     let attempt = 0;
     let lastError: ProviderApiError = new ProviderApiError("Provider request failed", null, true);
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      Accept: "application/json, text/javascript, */*; q=0.01",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      "X-Requested-With": "XMLHttpRequest",
+      "sec-ch-ua": '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": '"Windows"',
+      "Sec-Fetch-Dest": "empty",
+      "Sec-Fetch-Mode": "cors",
+      "Sec-Fetch-Site": "same-origin",
+    };
+
+    if (this.origin) {
+      headers["Origin"] = this.origin;
+      headers["Referer"] = `${this.origin}/`;
+    }
 
     while (attempt < this.maxRetries) {
       const controller = new AbortController();
@@ -93,12 +128,7 @@ export class HttpClient {
 
         const response = await fetch(this.baseUrl, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            Accept: "application/json, text/plain, */*",
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          },
+          headers,
           body: body.toString(),
           signal: controller.signal,
         });
@@ -121,7 +151,7 @@ export class HttpClient {
           } catch {
             const friendlyMessage = formatRawError(response.status, text);
             const error = new ProviderApiError(
-              `Provider returned non-JSON response: ${friendlyMessage}`,
+              friendlyMessage,
               response.status,
               false,
             );
