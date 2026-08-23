@@ -3,7 +3,7 @@ import { z } from "zod";
 import sql from "mssql";
 import { poolConnect } from "@/integrations/sqlServer/client";
 import { requireAuth } from "./auth/auth-middleware";
-import { createTopupSession, getTopupStatus, verifyTopupPayment } from "./payments.server";
+import { createTopupSession, getTopupStatus, verifyAndCreditUtr } from "./payments.server";
 
 const amountSchema = z.object({
   amount: z.number().positive().min(1, "Minimum top-up is ₹1").max(200000),
@@ -11,11 +11,9 @@ const amountSchema = z.object({
 
 const statusSchema = z.object({ paymentOrderId: z.string().uuid() });
 
-const verifySchema = z.object({
+const utrSchema = z.object({
   paymentOrderId: z.string().uuid(),
-  razorpayPaymentId: z.string().min(1),
-  razorpayOrderId: z.string().min(1),
-  razorpaySignature: z.string().min(1),
+  utrNumber: z.string().min(6, "Enter a valid 12-digit UTR/Transaction number").max(30),
 });
 
 export const createWalletTopup = createServerFn({ method: "POST" })
@@ -23,15 +21,13 @@ export const createWalletTopup = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => amountSchema.parse(input))
   .handler(async ({ data, context }) => createTopupSession(context.userId, data.amount));
 
-export const verifyWalletTopup = createServerFn({ method: "POST" })
+export const submitUpiUtr = createServerFn({ method: "POST" })
   .middleware([requireAuth])
-  .inputValidator((input: unknown) => verifySchema.parse(input))
+  .inputValidator((input: unknown) => utrSchema.parse(input))
   .handler(async ({ data, context }) =>
-    verifyTopupPayment(context.userId, {
+    verifyAndCreditUtr(context.userId, {
       paymentOrderId: data.paymentOrderId,
-      razorpayPaymentId: data.razorpayPaymentId,
-      razorpayOrderId: data.razorpayOrderId,
-      razorpaySignature: data.razorpaySignature,
+      utrNumber: data.utrNumber,
     })
   );
 

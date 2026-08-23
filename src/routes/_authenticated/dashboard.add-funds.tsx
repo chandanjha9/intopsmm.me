@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,10 @@ import {
   RefreshCw,
   Sparkles,
   ExternalLink,
+  ArrowRight,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { checkWalletTopup, createWalletTopup, verifyWalletTopup, listMyTopups } from "@/lib/payments.functions";
+import { createWalletTopup, submitUpiUtr, listMyTopups } from "@/lib/payments.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
@@ -49,21 +50,14 @@ const MAX_AMOUNT = 200000;
 
 type ActiveQRSession = {
   paymentOrderId: string;
-  gatewayOrderId: string;
-  paymentLinkId: string;
+  orderRef: string;
   amount: number;
-  keyId: string;
   qrDataUrl: string;
-  shortUrl: string;
-  upiIntentUrl?: string;
+  upiIntentUrl: string;
+  upiVpa: string;
+  upiName: string;
   expiresAt: number;
 };
-
-declare global {
-  interface Window {
-    Razorpay?: any;
-  }
-}
 
 function AddFundsPage() {
   const [amount, setAmount] = useState("1");
@@ -71,28 +65,19 @@ function AddFundsPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeSession, setActiveSession] = useState<ActiveQRSession | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [utrNumber, setUtrNumber] = useState("");
+  const [isVerifyingUtr, setIsVerifyingUtr] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const queryClient = useQueryClient();
   const fetchTopups = useServerFn(listMyTopups);
   const startTopup = useServerFn(createWalletTopup);
-  const verifyTopup = useServerFn(verifyWalletTopup);
-  const checkTopup = useServerFn(checkWalletTopup);
+  const verifyUtr = useServerFn(submitUpiUtr);
 
   const fmt = useMemo(() => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }), []);
   const amt = Math.max(0, Number(amount) || 0);
 
   const topups = useQuery({ queryKey: ["my-topups"], queryFn: () => fetchTopups({}) });
-
-  // Load Razorpay official Checkout SDK
-  useEffect(() => {
-    if (typeof window !== "undefined" && !window.Razorpay) {
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.async = true;
-      document.body.appendChild(script);
-    }
-  }, []);
 
   const amountError =
     amount !== "" && (amt < MIN_AMOUNT || amt > MAX_AMOUNT)
@@ -118,107 +103,49 @@ function AddFundsPage() {
     return () => clearInterval(interval);
   }, [activeSession, paymentSuccess]);
 
-  // Handle successful credit
-  const handleCreditSuccess = useCallback(
-    async (creditAmt: number) => {
-      setPaymentSuccess(true);
-      toast.success(`🎉 Payment of ₹${fmt.format(creditAmt)} received! Added to wallet.`);
-      await queryClient.invalidateQueries();
-    },
-    [fmt, queryClient]
-  );
-
-  // Poll for payment completion when QR session is active
-  useEffect(() => {
-    if (!activeSession || paymentSuccess || timeLeft <= 0) return;
-
-    const pollTimer = setInterval(async () => {
-      try {
-        const res = await checkTopup({ data: { paymentOrderId: activeSession.paymentOrderId } });
-        if (res.status === "paid") {
-          handleCreditSuccess(activeSession.amount);
-          clearInterval(pollTimer);
-        }
-      } catch {
-        // Continue polling
-      }
-    }, 2500);
-
-    return () => clearInterval(pollTimer);
-  }, [activeSession, paymentSuccess, timeLeft, checkTopup, handleCreditSuccess]);
-
-  // Launch official Razorpay Checkout with Dynamic UPI QR
-  const openRazorpayCheckout = useCallback(
-    (session: ActiveQRSession) => {
-      if (typeof window === "undefined" || !window.Razorpay) {
-        // Fallback: open hosted payment link
-        window.open(session.shortUrl, "_blank");
-        return;
-      }
-
-      try {
-        const rzp = new window.Razorpay({
-          key: session.keyId,
-          amount: Math.round(session.amount * 100),
-          currency: "INR",
-          name: "GrowMeSMM",
-          description: `Wallet Top-Up ₹${session.amount}`,
-          order_id: session.gatewayOrderId,
-          prefill: {
-            name: "GrowMeSMM User",
-            email: "user@growmesmm.in",
-          },
-          theme: {
-            color: "#10b981",
-          },
-          handler: async function (response: any) {
-            try {
-              await verifyTopup({
-                data: {
-                  paymentOrderId: session.paymentOrderId,
-                  razorpayPaymentId: response.razorpay_payment_id,
-                  razorpayOrderId: response.razorpay_order_id,
-                  razorpaySignature: response.razorpay_signature,
-                },
-              });
-              handleCreditSuccess(session.amount);
-            } catch (vErr) {
-              console.warn("Signature verification:", vErr);
-              // Polling will catch it as fallback
-            }
-          },
-          modal: {
-            ondismiss: function () {
-              // User closed modal — QR session remains visible on page with timer
-            },
-          },
-        });
-        rzp.open();
-      } catch (err) {
-        console.error("Razorpay open error:", err);
-        window.open(session.shortUrl, "_blank");
-      }
-    },
-    [verifyTopup, handleCreditSuccess]
-  );
-
   // Generate dynamic QR code
   const handleGenerateQR = async () => {
     if (!canGenerate) return;
     setIsGenerating(true);
     setPaymentSuccess(false);
+    setUtrNumber("");
 
     try {
       const session = await startTopup({ data: { amount: amt } });
       setActiveSession(session);
       setTimeLeft(Math.max(0, Math.floor((session.expiresAt - Date.now()) / 1000)));
-      toast.success(`Dynamic UPI QR generated for ₹${fmt.format(amt)}.`);
-      // Auto-open Razorpay's official UPI QR modal
-      openRazorpayCheckout(session);
+      toast.success(`Dynamic UPI QR generated for ₹${fmt.format(amt)}. Scan & Pay.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to generate QR code");
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Submit & Verify UTR
+  const handleVerifyUtr = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!activeSession || !utrNumber.trim()) {
+      toast.error("Please enter the 12-digit UPI UTR / Transaction ID from your payment app");
+      return;
+    }
+
+    setIsVerifyingUtr(true);
+    try {
+      await verifyUtr({
+        data: {
+          paymentOrderId: activeSession.paymentOrderId,
+          utrNumber: utrNumber.trim(),
+        },
+      });
+
+      setPaymentSuccess(true);
+      toast.success(`🎉 Payment of ₹${fmt.format(activeSession.amount)} verified & added to wallet!`);
+      await queryClient.invalidateQueries();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to verify UTR. Please check the number and try again.");
+    } finally {
+      setIsVerifyingUtr(false);
     }
   };
 
@@ -231,7 +158,7 @@ function AddFundsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.info("QR Code downloaded! Open PhonePe/GPay/Paytm to scan.");
+    toast.info("QR Code downloaded! Open PhonePe/GPay/Paytm to scan from gallery.");
   };
 
   const minutes = Math.floor(timeLeft / 60);
@@ -322,7 +249,7 @@ function AddFundsPage() {
               >
                 {isGenerating ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating Dynamic UPI QR…
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating 5-Min Dynamic QR…
                   </>
                 ) : (
                   <>
@@ -349,6 +276,7 @@ function AddFundsPage() {
                         onClick={() => {
                           setActiveSession(null);
                           setPaymentSuccess(false);
+                          setUtrNumber("");
                         }}
                         className="mt-4 rounded-xl bg-emerald-500 font-semibold text-white hover:bg-emerald-600"
                       >
@@ -374,7 +302,7 @@ function AddFundsPage() {
                     </div>
                   ) : (
                     /* Active 5-Minute QR State */
-                    <div className="text-center">
+                    <div className="text-center space-y-4">
                       {/* Timer Badge */}
                       <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-sm font-bold text-emerald-400">
                         <Clock className="h-4 w-4 animate-spin text-emerald-400" />
@@ -382,7 +310,7 @@ function AddFundsPage() {
                       </div>
 
                       {/* QR Image Box */}
-                      <div className="mx-auto my-4 flex aspect-square w-full max-w-[240px] items-center justify-center rounded-2xl border-2 border-emerald-500/40 bg-white p-3 shadow-2xl">
+                      <div className="mx-auto my-2 flex aspect-square w-full max-w-[240px] items-center justify-center rounded-2xl border-2 border-emerald-500/40 bg-white p-3 shadow-2xl">
                         <img
                           src={activeSession.qrDataUrl}
                           alt={`UPI QR for ₹${activeSession.amount}`}
@@ -395,11 +323,12 @@ function AddFundsPage() {
                         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                           Pay Exact Amount
                         </p>
-                        <p className="text-2xl font-black text-foreground">₹{fmt.format(activeSession.amount)}</p>
+                        <p className="text-3xl font-black text-foreground">₹{fmt.format(activeSession.amount)}</p>
+                        <p className="text-xs text-muted-foreground">UPI ID: <span className="font-mono font-semibold text-foreground">{activeSession.upiVpa}</span></p>
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="mt-4 grid grid-cols-2 gap-2.5">
+                      <div className="grid grid-cols-2 gap-2.5">
                         <Button
                           variant="outline"
                           onClick={handleDownloadQR}
@@ -408,18 +337,48 @@ function AddFundsPage() {
                           <Download className="mr-1.5 h-4 w-4" /> Download QR
                         </Button>
                         <Button
-                          onClick={() => openRazorpayCheckout(activeSession)}
+                          asChild
                           className="h-11 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700"
                         >
-                          <ExternalLink className="mr-1.5 h-4 w-4" /> Open Official UPI QR
+                          <a href={activeSession.upiIntentUrl}>
+                            <ExternalLink className="mr-1.5 h-4 w-4" /> Pay via App
+                          </a>
                         </Button>
                       </div>
 
-                      {/* Live Polling Status */}
-                      <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-secondary/30 py-2 text-xs font-medium text-muted-foreground">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
-                        Waiting for payment... Auto-updates instantly
-                      </div>
+                      {/* UTR Verification Section */}
+                      <form onSubmit={handleVerifyUtr} className="pt-3 border-t border-border/40 space-y-3">
+                        <div className="text-left space-y-1">
+                          <Label htmlFor="utr" className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                            <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+                            Enter 12-Digit UPI Ref / UTR No. After Payment:
+                          </Label>
+                          <Input
+                            id="utr"
+                            value={utrNumber}
+                            onChange={(e) => setUtrNumber(e.target.value.replace(/[^0-9A-Za-z]/g, ""))}
+                            placeholder="e.g. 423589123456"
+                            maxLength={22}
+                            className="h-11 rounded-xl border-emerald-500/40 bg-background/90 text-sm font-mono tracking-wider font-bold"
+                          />
+                        </div>
+
+                        <Button
+                          type="submit"
+                          disabled={!utrNumber.trim() || isVerifyingUtr}
+                          className="h-12 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 font-bold text-sm text-white shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-teal-700"
+                        >
+                          {isVerifyingUtr ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying & Adding Funds…
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="mr-2 h-4 w-4" /> Verify & Add to Wallet
+                            </>
+                          )}
+                        </Button>
+                      </form>
                     </div>
                   )}
                 </div>
@@ -433,7 +392,7 @@ function AddFundsPage() {
           {/* Instructions */}
           <Card className="glass border-border/60 p-5 shadow-card">
             <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              <Sparkles className="h-4 w-4 text-emerald-400" /> How 5-Min Dynamic QR Works
+              <Sparkles className="h-4 w-4 text-emerald-400" /> How Dynamic UPI QR Works
             </h3>
             <ol className="mt-3 space-y-2.5 text-xs text-muted-foreground">
               <li className="flex gap-2">
@@ -446,19 +405,19 @@ function AddFundsPage() {
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
                   2
                 </span>
-                <span>Official UPI QR code opens with PhonePe, Google Pay, Paytm, BHIM options.</span>
+                <span>Scan the QR code with <strong>PhonePe, Google Pay, Paytm, or BHIM</strong>.</span>
               </li>
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
                   3
                 </span>
-                <span>Complete payment within <strong>5 minutes</strong>.</span>
+                <span>Complete the payment within <strong>5 minutes</strong>.</span>
               </li>
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
                   4
                 </span>
-                <span>Your wallet balance updates <strong>automatically without refreshing</strong>.</span>
+                <span>Enter the <strong>12-digit UTR / UPI Ref ID</strong> and click <strong>Verify</strong> to credit wallet instantly.</span>
               </li>
             </ol>
             <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-500/10 p-3 text-[11px] font-medium text-emerald-400">
