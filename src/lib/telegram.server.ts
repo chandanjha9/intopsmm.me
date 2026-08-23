@@ -59,6 +59,64 @@ export async function sendTelegramPaymentAlert(params: {
     return false;
   }
 }
+/**
+ * Sends a low provider balance alert to admin on Telegram with 1-Click Process/Refund buttons.
+ */
+export async function sendTelegramLowBalanceAlert(params: {
+  orderId: string;
+  userEmail: string;
+  serviceName: string;
+  quantity: number;
+  charge: number;
+  link: string;
+  reason?: string;
+}) {
+  const shortId = params.orderId.slice(0, 8);
+  const message = `
+⚠️ <b>PROVIDER BALANCE LOW — ORDER QUEUED!</b>
+━━━━━━━━━━━━━━━━━━━━━
+🆔 <b>Order ID:</b> <code>#${shortId}</code> (${params.orderId})
+👤 <b>User:</b> <code>${params.userEmail}</code>
+🛠 <b>Service:</b> ${params.serviceName}
+🔢 <b>Quantity:</b> ${params.quantity.toLocaleString("en-IN")}
+💰 <b>User Charged:</b> <b>₹${params.charge.toFixed(4)}</b>
+🔗 <b>Link:</b> <code>${params.link}</code>
+━━━━━━━━━━━━━━━━━━━━━
+<i>Reason: ${params.reason || "Provider account has insufficient funds. Order is held in Admin Queue."}
+Please recharge your SMM provider account and click "Process Order" below:</i>
+`.trim();
+
+  const inlineKeyboard = {
+    inline_keyboard: [
+      [
+        { text: "🚀 Process Order", callback_data: `pord_${params.orderId}` },
+        { text: "❌ Refund Order", callback_data: `cord_${params.orderId}` },
+      ],
+    ],
+  };
+
+  try {
+    const res = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_ADMIN_CHAT_ID,
+        text: message,
+        parse_mode: "HTML",
+        reply_markup: inlineKeyboard,
+      }),
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      console.warn("[telegram] Failed to send low balance alert:", data);
+    }
+    return data.ok;
+  } catch (err) {
+    console.error("[telegram] Low balance alert send error:", err);
+    return false;
+  }
+}
 
 /**
  * Handles incoming Telegram webhook updates (button clicks on Approve/Reject).
@@ -180,10 +238,84 @@ export async function handleTelegramWebhook(update: any) {
 
       return new Response("ok");
     }
+
+    // Process queued order
+    if (data.startsWith("pord_")) {
+      const orderId = data.replace("pord_", "");
+      try {
+        const { processSingleQueuedOrder } = await import("./orders.server");
+        const result = await processSingleQueuedOrder(orderId);
+
+        if (result.success) {
+          await answerCallbackQuery(callbackId, `✅ Success! Order #${orderId.slice(0, 8)} forwarded to provider.`);
+          if (chatId && messageId) {
+            await editMessageText(
+              chatId,
+              messageId,
+              `
+✅ <b>ORDER PROCESSED & FORWARDED!</b> 🚀
+━━━━━━━━━━━━━━━━━━━━━
+🆔 <b>Order ID:</b> <code>#${orderId.slice(0, 8)}</code>
+📦 <b>Provider Order ID:</b> <code>#${result.providerOrderId || "N/A"}</code>
+⏱️ <b>Processed At:</b> ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+━━━━━━━━━━━━━━━━━━━━━
+<i>The queued order has been successfully submitted to your SMM provider.</i>
+`.trim()
+            );
+          }
+        } else {
+          await answerCallbackQuery(callbackId, `⚠️ Failed: ${result.message}`);
+        }
+      } catch (err) {
+        await answerCallbackQuery(callbackId, `❌ Error: ${err instanceof Error ? err.message : "Failed to process"}`);
+      }
+      return new Response("ok");
+    }
+
+    // Cancel and refund queued order
+    if (data.startsWith("cord_")) {
+      const orderId = data.replace("cord_", "");
+      try {
+        await db
+          .request()
+          .input("orderId", sql.UniqueIdentifier, orderId)
+          .input("reason", sql.NVarChar, "Cancelled from Admin Telegram bot")
+          .execute("sp_refund_order");
+
+        await db
+          .request()
+          .input("orderId", sql.UniqueIdentifier, orderId)
+          .input("status", sql.NVarChar, "canceled")
+          .input("errorMessage", sql.NVarChar, "Cancelled and refunded by Admin via Telegram")
+          .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
+          .query("UPDATE orders SET status = @status, error_message = @errorMessage, updated_at = @updatedAt WHERE id = @orderId");
+
+        await answerCallbackQuery(callbackId, `❌ Order #${orderId.slice(0, 8)} cancelled and refunded.`);
+
+        if (chatId && messageId) {
+          await editMessageText(
+            chatId,
+            messageId,
+            `
+❌ <b>QUEUED ORDER CANCELLED & REFUNDED</b>
+━━━━━━━━━━━━━━━━━━━━━
+🆔 <b>Order ID:</b> <code>#${orderId.slice(0, 8)}</code>
+⏱️ <b>Cancelled At:</b> ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+━━━━━━━━━━━━━━━━━━━━━
+<i>The order was cancelled and the customer's wallet balance has been refunded.</i>
+`.trim()
+          );
+        }
+      } catch (err) {
+        await answerCallbackQuery(callbackId, `❌ Refund Error: ${err instanceof Error ? err.message : "Failed to refund"}`);
+      }
+      return new Response("ok");
+    }
   }
 
   return new Response("ok");
 }
+
 
 async function answerCallbackQuery(callbackQueryId: string, text: string) {
   try {

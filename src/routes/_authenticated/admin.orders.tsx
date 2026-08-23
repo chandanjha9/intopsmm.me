@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { adminListAllOrders, adminUpdateOrderStatus, adminSyncStatuses } from "@/lib/providers/admin.functions";
+import {
+  adminListAllOrders,
+  adminUpdateOrderStatus,
+  adminSyncStatuses,
+  adminProcessQueuedOrder,
+  adminProcessAllQueuedOrders,
+} from "@/lib/providers/admin.functions";
 import {
   RefreshCw,
   Search,
@@ -19,6 +25,8 @@ import {
   AlertTriangle,
   User,
   Link as LinkIcon,
+  Play,
+  Zap,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/orders")({
@@ -224,6 +232,8 @@ function AdminOrdersPage() {
   const queryClient = useQueryClient();
   const fetchOrders = useServerFn(adminListAllOrders);
   const syncFn = useServerFn(adminSyncStatuses);
+  const processOneFn = useServerFn(adminProcessQueuedOrder);
+  const processAllFn = useServerFn(adminProcessAllQueuedOrders);
 
   const [statusFilter, setStatusFilter] = useState<StatusOption>("all");
   const [search, setSearch] = useState("");
@@ -262,6 +272,40 @@ function AdminOrdersPage() {
     onError: (err: Error) => toast.error("Sync failed", { description: err.message }),
   });
 
+  const processOneJob = useMutation({
+    mutationFn: (orderId: string) => processOneFn({ data: { orderId } }),
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success("Order forwarded to provider!", { description: res.message });
+      } else {
+        toast.error("Failed to forward", { description: res.message });
+      }
+      void queryClient.invalidateQueries({ queryKey: ["admin-all-orders"] });
+    },
+    onError: (err: Error) => toast.error("Process failed", { description: err.message }),
+  });
+
+  const processAllJob = useMutation({
+    mutationFn: () => processAllFn(),
+    onSuccess: (res) => {
+      toast.success(`Processed ${res.processed} of ${res.total} queued orders`, {
+        description: res.failed > 0 ? `${res.failed} orders still failed (check provider balance)` : "All queued orders forwarded!",
+      });
+      void queryClient.invalidateQueries({ queryKey: ["admin-all-orders"] });
+    },
+    onError: (err: Error) => toast.error("Batch process failed", { description: err.message }),
+  });
+
+  const queuedOrders = useMemo(() => {
+    return orders.filter(
+      (o) =>
+        o.status === "pending" &&
+        ((o.error_message || "").toLowerCase().includes("queued") ||
+          (o.error_message || "").toLowerCase().includes("balance") ||
+          !o.provider_order_id),
+    );
+  }, [orders]);
+
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const o of orders) {
@@ -290,18 +334,64 @@ function AdminOrdersPage() {
             View and manage every customer order. Update statuses or sync from provider.
           </p>
         </div>
-        <Button
-          id="sync-orders-btn"
-          variant="outline"
-          size="sm"
-          className="ml-auto"
-          disabled={syncJob.isPending}
-          onClick={() => syncJob.mutate()}
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${syncJob.isPending ? "animate-spin" : ""}`} />
-          Sync from Provider
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          {queuedOrders.length > 0 && (
+            <Button
+              id="process-all-queued-btn"
+              variant="default"
+              size="sm"
+              className="bg-amber-600 font-bold text-white hover:bg-amber-700 shadow-md"
+              disabled={processAllJob.isPending}
+              onClick={() => processAllJob.mutate()}
+            >
+              {processAllJob.isPending ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-1.5 h-4 w-4 fill-white" />
+              )}
+              Process All Queued ({queuedOrders.length})
+            </Button>
+          )}
+          <Button
+            id="sync-orders-btn"
+            variant="outline"
+            size="sm"
+            disabled={syncJob.isPending}
+            onClick={() => syncJob.mutate()}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${syncJob.isPending ? "animate-spin" : ""}`} />
+            Sync from Provider
+          </Button>
+        </div>
       </div>
+
+      {/* Queued Orders Banner */}
+      {queuedOrders.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-300">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500/20 text-amber-400">
+              <Zap className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-sm font-bold text-amber-200">
+                {queuedOrders.length} Order{queuedOrders.length > 1 ? "s" : ""} Held in Admin Queue (Provider Balance Low)
+              </p>
+              <p className="text-xs text-amber-300/80">
+                User payments are already debited. Add balance to your SMM provider wallet, then click "Process All" to dispatch.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="rounded-xl bg-amber-500 font-bold text-black hover:bg-amber-400"
+            disabled={processAllJob.isPending}
+            onClick={() => processAllJob.mutate()}
+          >
+            {processAllJob.isPending ? "Forwarding to Provider…" : "Process All Queued Orders"}
+          </Button>
+        </div>
+      )}
+
 
       {/* Summary pills */}
       <div className="flex flex-wrap gap-2">
@@ -419,15 +509,29 @@ function AdminOrdersPage() {
                     </td>
                     <td className="px-4 py-3 text-right font-semibold">₹{order.charge.toFixed(4)}</td>
                     <td className="px-4 py-3 text-right">
-                      <Button
-                        id={`update-order-${order.id}`}
-                        size="sm"
-                        variant="outline"
-                        className="h-7 px-2 text-xs opacity-0 transition group-hover:opacity-100"
-                        onClick={() => setSelectedOrder(order)}
-                      >
-                        Update
-                      </Button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {order.status === "pending" && !order.provider_order_id && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="h-7 bg-amber-600 px-2.5 text-[11px] font-bold text-white hover:bg-amber-700"
+                            disabled={processOneJob.isPending}
+                            onClick={() => processOneJob.mutate(order.id)}
+                          >
+                            <Play className="mr-1 h-3 w-3 fill-white" />
+                            Process
+                          </Button>
+                        )}
+                        <Button
+                          id={`update-order-${order.id}`}
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs opacity-0 transition group-hover:opacity-100"
+                          onClick={() => setSelectedOrder(order)}
+                        >
+                          Update
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -327,3 +327,21 @@ export const adminOverview = createServerFn({ method: "GET" })
     await requireAdmin(context.userId);
     return fetchAdminOverview();
   });
+
+export const adminProcessQueuedOrder = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((input: unknown) => z.object({ orderId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context.userId);
+    const { processSingleQueuedOrder } = await import("@/lib/orders.server");
+    return processSingleQueuedOrder(data.orderId);
+  });
+
+export const adminProcessAllQueuedOrders = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context.userId);
+    const { processAllQueuedOrders } = await import("@/lib/orders.server");
+    return processAllQueuedOrders();
+  });
+
