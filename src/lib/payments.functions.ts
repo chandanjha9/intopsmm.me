@@ -6,7 +6,7 @@ import { requireAuth } from "./auth/auth-middleware";
 import { createTopupSession, getTopupStatus } from "./payments.server";
 
 const amountSchema = z.object({
-  amount: z.number().positive().min(20, "Minimum top-up is ₹20").max(200000),
+  amount: z.number().positive().min(1, "Minimum top-up is ₹1").max(200000),
 });
 
 const statusSchema = z.object({ paymentOrderId: z.string().uuid() });

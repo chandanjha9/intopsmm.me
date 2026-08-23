@@ -47,8 +47,8 @@ export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
   component: AddFundsPage,
 });
 
-const QUICK_AMOUNTS = [100, 250, 500, 1000, 2500, 5000];
-const MIN_AMOUNT = 20;
+const QUICK_AMOUNTS = [1, 10, 100, 250, 500, 1000];
+const MIN_AMOUNT = 1;
 const MAX_AMOUNT = 200000;
 
 declare global {
