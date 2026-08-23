@@ -32,3 +32,7 @@ export const poolConnect: Promise<sql.ConnectionPool> = pool
   });
 
 export default sql;
+
+// Initialize Render keep-alive heartbeat engine
+import("@/lib/keep-alive.server").then((m) => m.initKeepAlive()).catch(() => {});
+

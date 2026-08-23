@@ -240,26 +240,26 @@ function DashboardPage() {
     <DashboardShell active="New Order">
 
           {/* Stats */}
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
             {stats.map((s) => (
-              <Card key={s.label} className="glass border-border/60 p-4 shadow-card">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
-                  <s.Icon className="h-4.5 w-4.5" />
+              <Card key={s.label} className="glass border-border/60 p-3 sm:p-4 shadow-card">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                  <s.Icon className="h-4 w-4" />
                 </span>
-                <p className="mt-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                <p className="mt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                   {s.label}
                 </p>
-                <p className="mt-0.5 truncate text-lg font-bold tracking-tight">{s.value}</p>
+                <p className="mt-0.5 truncate text-base font-bold tracking-tight">{s.value}</p>
               </Card>
             ))}
           </section>
 
           {/* Order composer */}
-          <Card className="glass border-border/60 p-6 shadow-card">
+          <Card className="glass border-border/60 p-4 sm:p-6 shadow-card">
             <h2 className="text-lg font-bold">New Order</h2>
             <p className="text-sm text-muted-foreground">Choose a Platform</p>
 
-            <div className="mt-4 flex flex-wrap gap-3">
+            <div className="mt-4 flex flex-wrap gap-2 sm:gap-3">
               {platforms.map((p) => (
                 <button
                   key={p.key}
@@ -270,8 +270,8 @@ function DashboardPage() {
                   }}
                   title={p.key}
                   aria-label={p.key}
-                  className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white transition ${p.bg} ${
-                    platform === p.key ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "opacity-90 hover:opacity-100"
+                  className={`grid h-12 w-12 sm:h-11 sm:w-11 shrink-0 place-items-center rounded-xl text-white transition active:scale-95 ${p.bg} ${
+                    platform === p.key ? "ring-2 ring-primary ring-offset-2 ring-offset-background scale-105" : "opacity-90 hover:opacity-100"
                   }`}
                 >
                   <PlatformGlyph d={p.d} />
@@ -354,7 +354,7 @@ function DashboardPage() {
                       onChange={(e) => setLink(e.target.value)}
                       placeholder="https://instagram.com/yourhandle"
                       maxLength={500}
-                      className="h-11 rounded-xl border-border/60 bg-background"
+                      className="h-12 rounded-xl border-border/60 bg-background text-base"
                     />
                   </Field>
                   <Field label="Quantity">
@@ -362,28 +362,32 @@ function DashboardPage() {
                       inputMode="numeric"
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ""))}
-                      className="h-11 rounded-xl border-border/60 bg-background"
+                      className="h-12 rounded-xl border-border/60 bg-background text-base"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Min: {service.min_quantity.toLocaleString("en-IN")} - Max:{" "}
+                      Min: {service.min_quantity.toLocaleString("en-IN")} — Max:{" "}
                       {service.max_quantity.toLocaleString("en-IN")}
                     </p>
                   </Field>
                 </div>
 
-                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-secondary/40 p-4">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Charge</p>
-                    <p className="text-2xl font-bold">₹{charge}</p>
+                {/* Charge + Submit — sticky on mobile */}
+                <div className="mt-6 rounded-2xl border border-border/60 bg-secondary/40 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Total Charge</p>
+                      <p className="text-2xl font-bold">₹{charge}</p>
+                    </div>
+                    <Button
+                      variant="hero"
+                      size="lg"
+                      className="flex-1 max-w-[180px] h-12 text-base font-bold"
+                      disabled={!canSubmit}
+                      onClick={() => order.mutate()}
+                    >
+                      {order.isPending ? "Placing…" : "🚀 Submit Order"}
+                    </Button>
                   </div>
-                  <Button
-                    variant="hero"
-                    className="min-w-40"
-                    disabled={!canSubmit}
-                    onClick={() => order.mutate()}
-                  >
-                    {order.isPending ? "Placing…" : "Submit"}
-                  </Button>
                 </div>
               </>
             )}

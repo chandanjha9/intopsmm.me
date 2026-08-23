@@ -26,6 +26,7 @@ import { Route as AuthenticatedDashboardAddFundsRouteImport } from './routes/_au
 import { Route as AuthenticatedDashboardOrderHistoryRouteImport } from './routes/_authenticated/dashboard.order-history'
 import { Route as AuthenticatedDashboardRefillRouteImport } from './routes/_authenticated/dashboard.refill'
 import { Route as AuthenticatedDashboardTransactionsRouteImport } from './routes/_authenticated/dashboard.transactions'
+import { Route as ApiPublicPingRouteImport } from './routes/api/public/ping'
 import { Route as ApiPublicHooksBalanceSyncRouteImport } from './routes/api/public/hooks/balance-sync'
 import { Route as ApiPublicHooksCleanLogsRouteImport } from './routes/api/public/hooks/clean-logs'
 import { Route as ApiPublicHooksImportServicesRouteImport } from './routes/api/public/hooks/import-services'
@@ -126,6 +127,11 @@ const AuthenticatedDashboardTransactionsRoute =
     path: '/dashboard/transactions',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicPingRoute = ApiPublicPingRouteImport.update({
+  id: '/api/public/ping',
+  path: '/api/public/ping',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksBalanceSyncRoute =
   ApiPublicHooksBalanceSyncRouteImport.update({
     id: '/api/public/hooks/balance-sync',
@@ -181,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/order-history': typeof AuthenticatedDashboardOrderHistoryRoute
   '/dashboard/refill': typeof AuthenticatedDashboardRefillRoute
   '/dashboard/transactions': typeof AuthenticatedDashboardTransactionsRoute
+  '/api/public/ping': typeof ApiPublicPingRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/api/public/hooks/balance-sync': typeof ApiPublicHooksBalanceSyncRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/dashboard/order-history': typeof AuthenticatedDashboardOrderHistoryRoute
   '/dashboard/refill': typeof AuthenticatedDashboardRefillRoute
   '/dashboard/transactions': typeof AuthenticatedDashboardTransactionsRoute
+  '/api/public/ping': typeof ApiPublicPingRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/api/public/hooks/balance-sync': typeof ApiPublicHooksBalanceSyncRoute
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/order-history': typeof AuthenticatedDashboardOrderHistoryRoute
   '/_authenticated/dashboard/refill': typeof AuthenticatedDashboardRefillRoute
   '/_authenticated/dashboard/transactions': typeof AuthenticatedDashboardTransactionsRoute
+  '/api/public/ping': typeof ApiPublicPingRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/api/public/hooks/balance-sync': typeof ApiPublicHooksBalanceSyncRoute
@@ -259,6 +268,7 @@ export interface FileRouteTypes {
     | '/dashboard/order-history'
     | '/dashboard/refill'
     | '/dashboard/transactions'
+    | '/api/public/ping'
     | '/admin/'
     | '/dashboard/'
     | '/api/public/hooks/balance-sync'
@@ -283,6 +293,7 @@ export interface FileRouteTypes {
     | '/dashboard/order-history'
     | '/dashboard/refill'
     | '/dashboard/transactions'
+    | '/api/public/ping'
     | '/admin'
     | '/dashboard'
     | '/api/public/hooks/balance-sync'
@@ -309,6 +320,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/order-history'
     | '/_authenticated/dashboard/refill'
     | '/_authenticated/dashboard/transactions'
+    | '/api/public/ping'
     | '/_authenticated/admin/'
     | '/_authenticated/dashboard/'
     | '/api/public/hooks/balance-sync'
@@ -327,6 +339,7 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiPublicPingRoute: typeof ApiPublicPingRoute
   ApiPublicHooksBalanceSyncRoute: typeof ApiPublicHooksBalanceSyncRoute
   ApiPublicHooksCleanLogsRoute: typeof ApiPublicHooksCleanLogsRoute
   ApiPublicHooksImportServicesRoute: typeof ApiPublicHooksImportServicesRoute
@@ -457,6 +470,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardTransactionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/ping': {
+      id: '/api/public/ping'
+      path: '/api/public/ping'
+      fullPath: '/api/public/ping'
+      preLoaderRoute: typeof ApiPublicPingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/balance-sync': {
       id: '/api/public/hooks/balance-sync'
       path: '/api/public/hooks/balance-sync'
@@ -561,6 +581,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiPublicPingRoute: ApiPublicPingRoute,
   ApiPublicHooksBalanceSyncRoute: ApiPublicHooksBalanceSyncRoute,
   ApiPublicHooksCleanLogsRoute: ApiPublicHooksCleanLogsRoute,
   ApiPublicHooksImportServicesRoute: ApiPublicHooksImportServicesRoute,

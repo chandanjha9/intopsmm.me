@@ -2,7 +2,6 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Dialog,
   DialogContent,
@@ -17,13 +16,14 @@ import {
   Plus,
   History,
   ArrowLeftRight,
-  Receipt,
-  Megaphone,
-  MoreVertical,
   RefreshCcw,
   ShieldCheck,
   ShoppingBag,
   LogOut,
+  User,
+  Menu,
+  X,
+  ChevronRight,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -31,13 +31,20 @@ import { useAuth } from "@/hooks/use-auth";
 import { isCurrentUserAdmin } from "@/lib/providers/admin.functions";
 
 const navItems = [
-  { icon: Plus, label: "New Order", to: "/dashboard" as const },
+  { icon: Plus, label: "New Order", to: "/dashboard" as const, emoji: "🛒" },
+  { icon: Wallet, label: "Add Funds", to: "/dashboard/add-funds" as const, emoji: "💰" },
+  { icon: History, label: "Order History", to: "/dashboard/order-history" as const, emoji: "📋" },
+  { icon: ArrowLeftRight, label: "Transactions", to: "/dashboard/transactions" as const, emoji: "💸" },
+  { icon: RefreshCcw, label: "Refill", to: "/dashboard/refill" as const, emoji: "🔄" },
+];
+
+// Bottom tab bar items (most used on mobile)
+const bottomTabItems = [
+  { icon: Plus, label: "Order", to: "/dashboard" as const },
   { icon: Wallet, label: "Add Funds", to: "/dashboard/add-funds" as const },
-  { icon: History, label: "Order History", to: "/dashboard/order-history" as const },
-  { icon: ArrowLeftRight, label: "Transactions", to: "/dashboard/transactions" as const },
-  { icon: RefreshCcw, label: "Refill", to: "/dashboard/refill" as const },
-  { icon: Receipt, label: "Payment History", to: "/dashboard" as const },
-  { icon: Megaphone, label: "Updates", to: "/dashboard" as const },
+  { icon: History, label: "History", to: "/dashboard/order-history" as const },
+  { icon: ArrowLeftRight, label: "Txns", to: "/dashboard/transactions" as const },
+  { icon: User, label: "Profile", to: "/dashboard" as const, isProfile: true },
 ];
 
 export function DashboardShell({ active, children }: { active: string; children: ReactNode }) {
@@ -79,12 +86,19 @@ export function DashboardShell({ active, children }: { active: string; children:
     }
   };
 
-  const sidebarPanel = (
-    <>
+  const sidebarContent = (
+    <div className="space-y-4">
+      {/* Wallet card */}
       <Card className="glass overflow-hidden border-border/60 shadow-card">
         <div className="bg-[image:var(--gradient-primary)] p-5 text-primary-foreground">
           <p className="text-xs font-semibold uppercase tracking-widest opacity-90">Wallet Balance</p>
           <p className="mt-1 text-3xl font-bold">{balance}</p>
+          <Link
+            to="/dashboard/add-funds"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold hover:bg-white/30 transition"
+          >
+            <Plus className="h-3 w-3" /> Add Funds
+          </Link>
         </div>
         <div className="p-3">
           <nav className="space-y-1">
@@ -94,14 +108,16 @@ export function DashboardShell({ active, children }: { active: string; children:
                 <Link
                   key={item.label}
                   to={item.to}
+                  onClick={() => setMenuOpen(false)}
                   className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                     isActive
                       ? "bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow"
                       : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                   }`}
                 >
-                  <item.icon className="h-4 w-4" />
+                  <item.icon className="h-4 w-4 shrink-0" />
                   <span>{item.label}</span>
+                  {isActive && <ChevronRight className="ml-auto h-3.5 w-3.5" />}
                 </Link>
               );
             })}
@@ -123,6 +139,7 @@ export function DashboardShell({ active, children }: { active: string; children:
                 <Link
                   key={item.label}
                   to={item.to}
+                  onClick={() => setMenuOpen(false)}
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                     item.label === active
                       ? "bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow"
@@ -138,92 +155,166 @@ export function DashboardShell({ active, children }: { active: string; children:
         </div>
       </Card>
 
+      {/* User card */}
       <Card className="glass border-border/60 p-4 shadow-card">
-        <p className="text-sm font-semibold">Good Day 🤝</p>
-        <p className="truncate text-xs text-muted-foreground">{username}</p>
-        <div className="mt-3 flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1" asChild>
-            <Link to="/dashboard">Settings</Link>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setShowLogoutConfirm(true)}
-          >
-            Logout
-          </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] text-primary-foreground">
+            <User className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Good Day 🤝</p>
+            <p className="truncate text-xs text-muted-foreground">{username}</p>
+          </div>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-3 w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={() => { setMenuOpen(false); setShowLogoutConfirm(true); }}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
       </Card>
-    </>
+    </div>
   );
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Ambient background */}
       <div className="pointer-events-none fixed inset-0 -z-10 opacity-70">
         <div className="absolute -left-40 top-0 h-96 w-96 rounded-full bg-primary/20 blur-3xl" />
         <div className="absolute right-0 top-1/3 h-[28rem] w-[28rem] rounded-full bg-emerald-400/15 blur-3xl" />
       </div>
 
-      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-[1400px] items-center gap-4 px-6">
-          <Link to="/dashboard" className="inline-flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
-              <TrendingUp className="h-5 w-5" />
+      {/* ===== HEADER ===== */}
+      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4 sm:px-6">
+          {/* Brand */}
+          <Link to="/dashboard" className="inline-flex items-center gap-2 shrink-0">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
+              <TrendingUp className="h-4 w-4" />
             </span>
-            <span className="text-lg font-bold tracking-tight">Intopsmm</span>
+            <span className="text-base font-bold tracking-tight">Intopsmm</span>
           </Link>
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Open menu"
-              className="rounded-full lg:hidden"
-              onClick={() => setMenuOpen(true)}
+
+          {/* Mobile: wallet balance pill in header */}
+          <div className="lg:hidden ml-auto flex items-center gap-2">
+            <Link
+              to="/dashboard/add-funds"
+              className="flex items-center gap-1.5 rounded-full bg-[image:var(--gradient-primary)] px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-glow"
             >
-              <MoreVertical className="h-5 w-5" />
-            </Button>
+              <Wallet className="h-3.5 w-3.5" />
+              <span>{balance}</span>
+            </Link>
+            <button
+              aria-label="Open menu"
+              onClick={() => setMenuOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-background hover:bg-secondary transition"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Desktop: right side username */}
+          <div className="hidden lg:flex ml-auto items-center gap-3">
+            <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background px-3 py-2">
+              <div className="h-7 w-7 rounded-full bg-[image:var(--gradient-primary)] flex items-center justify-center text-primary-foreground">
+                <User className="h-3.5 w-3.5" />
+              </div>
+              <span className="text-sm font-medium">{username}</span>
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-[1400px] gap-6 px-6 py-6">
+      {/* ===== MOBILE SLIDE-IN DRAWER ===== */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setMenuOpen(false)}
+          />
+          {/* Drawer panel */}
+          <div className="absolute left-0 top-0 h-full w-[min(85vw,320px)] overflow-y-auto bg-background p-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-[image:var(--gradient-primary)] text-primary-foreground">
+                  <TrendingUp className="h-4 w-4" />
+                </span>
+                <span className="font-bold">Intopsmm</span>
+              </div>
+              <button
+                onClick={() => setMenuOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-secondary transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+
+      {/* ===== MAIN LAYOUT ===== */}
+      <div className="mx-auto flex max-w-[1400px] gap-6 px-4 pb-24 pt-4 sm:px-6 sm:pb-24 lg:pb-6 lg:py-6">
+        {/* Desktop sidebar */}
         <aside className="hidden w-72 shrink-0 lg:block">
-          <div className="sticky top-24 space-y-4">{sidebarPanel}</div>
+          <div className="sticky top-20 space-y-4">{sidebarContent}</div>
         </aside>
 
-        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-          <SheetContent side="left" className="w-[19rem] overflow-y-auto p-4">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Dashboard menu</SheetTitle>
-            </SheetHeader>
-            <div className="space-y-4" onClick={() => setMenuOpen(false)}>
-              {sidebarPanel}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        <main className="min-w-0 flex-1 space-y-6">{children}</main>
+        {/* Main content */}
+        <main className="min-w-0 flex-1 space-y-4">{children}</main>
       </div>
 
-      {/* Logout Confirmation Modal */}
+      {/* ===== MOBILE BOTTOM TAB BAR ===== */}
+      <nav className="fixed bottom-0 inset-x-0 z-40 lg:hidden border-t border-border/60 bg-background/95 backdrop-blur-xl">
+        <div className="flex h-16 items-stretch">
+          {bottomTabItems.map((item) => {
+            const isActive = item.label === active || (item.isProfile && false);
+            const activeNavLabel = active;
+            const tabActive = navItems.find(n => n.label === activeNavLabel)?.to === item.to && !item.isProfile;
+            return (
+              <Link
+                key={item.label}
+                to={item.to}
+                className={`flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${
+                  tabActive
+                    ? "text-primary"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <div className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                  tabActive ? "bg-primary/10" : ""
+                }`}>
+                  <item.icon className={`h-5 w-5 ${tabActive ? "text-primary" : ""}`} />
+                </div>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* ===== LOGOUT CONFIRM MODAL ===== */}
       <Dialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
-        <DialogContent className="sm:max-w-[420px] rounded-2xl p-6 border-border/60">
+        <DialogContent className="sm:max-w-[420px] rounded-2xl p-6 border-border/60 mx-4">
           <DialogHeader className="space-y-2 text-center sm:text-left">
             <div className="mx-auto sm:mx-0 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/15 text-destructive">
               <LogOut className="h-6 w-6" />
             </div>
             <DialogTitle className="text-lg font-bold">Confirm Log Out</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Are you sure you want to log out of your <strong>Intopsmm</strong> account? You will need to enter your password to log in again.
+              Are you sure you want to log out of your <strong>Intopsmm</strong> account?
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+          <DialogFooter className="mt-4 flex gap-2">
             <Button
               variant="outline"
               disabled={isLoggingOut}
               onClick={() => setShowLogoutConfirm(false)}
-              className="rounded-xl font-semibold"
+              className="flex-1 rounded-xl font-semibold"
             >
               Cancel
             </Button>
@@ -231,7 +322,7 @@ export function DashboardShell({ active, children }: { active: string; children:
               variant="destructive"
               disabled={isLoggingOut}
               onClick={handleConfirmSignOut}
-              className="rounded-xl font-bold bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="flex-1 rounded-xl font-bold"
             >
               {isLoggingOut ? "Logging out…" : "Yes, Log Out"}
             </Button>
