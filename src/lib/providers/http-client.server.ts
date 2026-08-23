@@ -47,6 +47,20 @@ function classifyProviderError(message: string): ProviderApiError {
   return new ProviderApiError(message, null, retryable);
 }
 
+function formatRawError(status: number, text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html") || trimmed.includes("Cloudflare")) {
+    if (status === 403) {
+      return "Provider returned 403 Forbidden (Cloudflare / Bot Protection). Please ensure the API URL is direct (e.g., https://domain.com/api/v2) and verify if the provider requires IP whitelisting.";
+    }
+    if (status === 404) {
+      return "Provider returned 404 Not Found. Please check that the API URL endpoint is correct (e.g., https://domain.com/api/v2).";
+    }
+    return `Provider returned an HTML page with HTTP status ${status}. Please verify the API URL endpoint.`;
+  }
+  return `Provider responded ${status}: ${text.slice(0, 200)}`;
+}
+
 /**
  * Reusable form-urlencoded JSON HTTP client with timeout, exponential-backoff
  * retries, response validation and structured logging. All provider traffic
@@ -81,7 +95,9 @@ export class HttpClient {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            Accept: "application/json",
+            Accept: "application/json, text/plain, */*",
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
           },
           body: body.toString(),
           signal: controller.signal,
@@ -90,11 +106,9 @@ export class HttpClient {
         const text = await response.text();
 
         if (!response.ok) {
-          const error = new ProviderApiError(
-            `Provider responded ${response.status}: ${text.slice(0, 300)}`,
-            response.status,
-            RETRYABLE_STATUS.has(response.status),
-          );
+          const friendlyMessage = formatRawError(response.status, text);
+          const isRetryable = RETRYABLE_STATUS.has(response.status) && !text.includes("<!DOCTYPE");
+          const error = new ProviderApiError(friendlyMessage, response.status, isRetryable);
           if (!error.retryable) {
             await this.log(action, payload, text, response.status, started, attempt, error.message);
             throw error;
@@ -105,10 +119,11 @@ export class HttpClient {
           try {
             parsed = JSON.parse(text);
           } catch {
+            const friendlyMessage = formatRawError(response.status, text);
             const error = new ProviderApiError(
-              `Provider returned malformed JSON: ${text.slice(0, 200)}`,
+              `Provider returned non-JSON response: ${friendlyMessage}`,
               response.status,
-              true,
+              false,
             );
             lastError = error;
             throw error;
