@@ -41,20 +41,11 @@ export type TopupSession = {
   qrDataUrl: string;
   shortUrl: string;
   upiIntentUrl?: string;
-  expiresAt: number; // timestamp in ms (5 minutes UI timer)
+  expiresAt: number; // timestamp in ms (5 minutes UI countdown)
 };
 
 /**
- * Creates an official Razorpay UPI Payment Link with `upi_link: true`.
- *
- * This generates a Razorpay-hosted payment page that:
- *  - On mobile: opens PhonePe / GPay / Paytm / BHIM natively (no "leaving app" warning)
- *  - On desktop: shows a UPI QR code on Razorpay's own page
- *  - Auto-verifies payment via webhook (payment_link.paid / payment.captured)
- *
- * The QR code displayed on our site encodes the Razorpay `short_url` so that
- * scanning from any camera/QR scanner opens the Razorpay page which then
- * invokes the user's UPI app natively.
+ * Creates an official Razorpay Order + UPI Payment Link.
  */
 export async function createTopupSession(userId: string, amount: number): Promise<TopupSession> {
   const { keyId } = credentials();
@@ -62,10 +53,9 @@ export async function createTopupSession(userId: string, amount: number): Promis
 
   const receipt = `w_${Date.now()}_${userId.slice(0, 6)}`;
   const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes UI countdown
-  // Razorpay requires minimum 15 min for payment link expiry
   const expireByUnix = Math.floor(Date.now() / 1000) + 16 * 60;
 
-  // 1. Create official Razorpay Order (for tracking)
+  // 1. Create official Razorpay Order
   const order = await razorpayFetch("/orders", {
     method: "POST",
     body: JSON.stringify({
@@ -78,39 +68,49 @@ export async function createTopupSession(userId: string, amount: number): Promis
 
   const gatewayOrderId = String(order.id);
 
-  // 2. Create UPI Payment Link (upi_link: true makes it UPI-native on mobile)
-  const plink = await razorpayFetch("/payment_links", {
-    method: "POST",
-    body: JSON.stringify({
-      amount: Math.round(amount * 100),
-      currency: "INR",
-      accept_partial: false,
-      description: `GrowMeSMM Wallet Top-Up ₹${amount}`,
-      customer: {
-        name: "Customer",
-        email: "user@growmesmm.in",
-      },
-      notify: { sms: false, email: false },
-      reminder_enable: false,
-      expire_by: expireByUnix,
-      upi_link: true, // KEY: Makes the link UPI-native — no "leaving app" warnings
-      notes: {
-        user_id: userId,
-        gateway_order_id: gatewayOrderId,
-        purpose: "wallet_topup",
-      },
-      callback_url: "https://intopsmm-me.onrender.com/dashboard/add-funds",
-      callback_method: "get",
-    }),
-  });
+  // 2. Create UPI Payment Link (upi_link: true)
+  let shortUrl = "";
+  let paymentLinkId = "";
 
-  const shortUrl = plink.short_url;
-  const paymentLinkId = plink.id;
+  try {
+    const plink = await razorpayFetch("/payment_links", {
+      method: "POST",
+      body: JSON.stringify({
+        amount: Math.round(amount * 100),
+        currency: "INR",
+        accept_partial: false,
+        description: `GrowMeSMM Wallet Top-Up ₹${amount}`,
+        customer: {
+          name: "GrowMeSMM User",
+          email: "user@growmesmm.in",
+        },
+        notify: { sms: false, email: false },
+        reminder_enable: false,
+        expire_by: expireByUnix,
+        upi_link: true,
+        notes: {
+          user_id: userId,
+          gateway_order_id: gatewayOrderId,
+          purpose: "wallet_topup",
+        },
+        callback_url: "https://intopsmm-me.onrender.com/dashboard/add-funds",
+        callback_method: "get",
+      }),
+    });
 
-  // 3. Generate High-Resolution QR Code of the Razorpay payment link
-  // When scanned, this opens Razorpay's UPI-optimized mobile page
-  // which directly invokes PhonePe/GPay/Paytm without browser redirect warnings
-  const qrDataUrl = await QRCode.toDataURL(shortUrl, {
+    if (plink && plink.short_url) {
+      shortUrl = plink.short_url;
+      paymentLinkId = plink.id;
+    }
+  } catch (err) {
+    console.warn("[razorpay] payment link error:", err);
+  }
+
+  // Target URL for fallback QR
+  const targetUrl = shortUrl || `https://api.razorpay.com/v1/checkout/embedded?order_id=${gatewayOrderId}`;
+
+  // 3. Generate QR Code image
+  const qrDataUrl = await QRCode.toDataURL(targetUrl, {
     errorCorrectionLevel: "H",
     margin: 2,
     width: 400,
@@ -126,7 +126,7 @@ export async function createTopupSession(userId: string, amount: number): Promis
     .input("userId", sql.UniqueIdentifier, userId)
     .input("gateway", sql.NVarChar, "razorpay")
     .input("gatewayOrderId", sql.NVarChar, gatewayOrderId)
-    .input("gatewayPaymentId", sql.NVarChar, paymentLinkId)
+    .input("gatewayPaymentId", sql.NVarChar, paymentLinkId || "")
     .input("amount", sql.Decimal(18, 4), amount)
     .input("currency", sql.NVarChar, "INR")
     .input("status", sql.NVarChar, "created")
@@ -145,34 +145,79 @@ export async function createTopupSession(userId: string, amount: number): Promis
     amount,
     keyId,
     qrDataUrl,
-    shortUrl,
-    upiIntentUrl: shortUrl, // Opens Razorpay's UPI-native page on mobile
+    shortUrl: targetUrl,
+    upiIntentUrl: targetUrl,
     expiresAt,
   };
 }
 
-/** Also polls Razorpay API to check payment link status (in addition to webhook) */
+/** Verifies client-side Razorpay signature and instantly credits wallet */
+export async function verifyTopupPayment(
+  userId: string,
+  params: {
+    paymentOrderId: string;
+    razorpayPaymentId: string;
+    razorpayOrderId: string;
+    razorpaySignature: string;
+  }
+) {
+  const { keySecret } = credentials();
+  const db = await poolConnect;
+
+  // Razorpay order signature verification: hmac_sha256(order_id + "|" + payment_id, secret)
+  const body = `${params.razorpayOrderId}|${params.razorpayPaymentId}`;
+  const expected = await hmacSha256Hex(keySecret, body);
+
+  if (!timingSafeEqual(params.razorpaySignature, expected)) {
+    throw new Error("Invalid payment signature");
+  }
+
+  // Fetch payment order
+  const orderRes = await db
+    .request()
+    .input("id", sql.UniqueIdentifier, params.paymentOrderId)
+    .query("SELECT id, user_id, amount, status FROM payment_orders WHERE id = @id");
+
+  const record = orderRes.recordset[0];
+  if (!record || record.user_id !== userId) {
+    throw new Error("Payment order not found");
+  }
+
+  const amount = Number(record.amount);
+
+  // Credit wallet atomically via Stored Procedure
+  await db
+    .request()
+    .input("gateway", sql.NVarChar, "razorpay")
+    .input("gatewayOrderId", sql.NVarChar, params.razorpayOrderId)
+    .input("gatewayPaymentId", sql.NVarChar, params.razorpayPaymentId)
+    .input("amount", sql.Decimal(18, 4), amount)
+    .output("success", sql.Bit)
+    .execute("sp_credit_wallet_from_payment");
+
+  return { success: true, amount };
+}
+
+/** Polls topup status */
 export async function getTopupStatus(userId: string, paymentOrderId: string) {
   const db = await poolConnect;
   const result = await db
     .request()
     .input("id", sql.UniqueIdentifier, paymentOrderId)
-    .query("SELECT id, user_id, status, amount, error_message, gateway_payment_id, updated_at FROM payment_orders WHERE id = @id");
+    .query("SELECT id, user_id, status, amount, error_message, gateway_order_id, gateway_payment_id, updated_at FROM payment_orders WHERE id = @id");
 
   const data = result.recordset[0];
   if (!data || data.user_id !== userId) throw new Error("Payment not found");
 
-  // If DB already says paid, return immediately
   if (data.status === "paid") {
     return { status: "paid" as const, amount: Number(data.amount), error: data.error_message };
   }
 
-  // Otherwise, also check Razorpay Payment Link status directly (backup for webhook delays)
+  // Backup check on Razorpay API directly
   if (data.gateway_payment_id && data.status === "created") {
     try {
       const plink = await razorpayFetch(`/payment_links/${data.gateway_payment_id}`);
       if (plink.status === "paid" && plink.amount_paid > 0) {
-        // Credit wallet directly since webhook may be delayed
         const amount = Number(plink.amount_paid) / 100;
         const gatewayOrderId = plink.notes?.gateway_order_id || data.gateway_order_id;
         try {
@@ -185,12 +230,12 @@ export async function getTopupStatus(userId: string, paymentOrderId: string) {
             .output("success", sql.Bit)
             .execute("sp_credit_wallet_from_payment");
         } catch {
-          // SP might fail if already credited by webhook — that's OK
+          // Ignore if already credited
         }
         return { status: "paid" as const, amount, error: null };
       }
     } catch {
-      // API check failed, rely on webhook
+      // Ignore API errors
     }
   }
 
@@ -221,7 +266,7 @@ function timingSafeEqual(a: string, b: string) {
   return diff === 0;
 }
 
-/** Verifies the Razorpay webhook signature and credits the wallet atomically. */
+/** Verifies the Razorpay webhook signature and credits wallet atomically */
 export async function handleRazorpayWebhook(rawBody: string, signature: string | null) {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!secret) return new Response("Webhook not configured", { status: 503 });
@@ -285,7 +330,6 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string |
       const amount = Number(payment?.amount ?? plink?.amount_paid ?? plink?.amount ?? order?.amount ?? 0) / 100;
       const paymentId = payment?.id ?? targetPaymentLinkId ?? "";
 
-      // Try credit by gateway_order_id (from notes)
       if (targetOrderId && amount > 0) {
         await db
           .request()
@@ -299,7 +343,6 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string |
         return new Response("ok");
       }
 
-      // Fallback: match by payment_link ID stored in gateway_payment_id column
       if (targetPaymentLinkId && amount > 0) {
         const row = await db
           .request()

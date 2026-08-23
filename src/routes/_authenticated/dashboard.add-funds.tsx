@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
@@ -10,20 +10,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Wallet,
   ShieldCheck,
-  ArrowRight,
   Loader2,
   CheckCircle2,
   XCircle,
   Download,
   QrCode,
-  CreditCard,
   Clock,
   RefreshCw,
   Sparkles,
   ExternalLink,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { checkWalletTopup, createWalletTopup, listMyTopups } from "@/lib/payments.functions";
+import { checkWalletTopup, createWalletTopup, verifyWalletTopup, listMyTopups } from "@/lib/payments.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
@@ -54,11 +52,18 @@ type ActiveQRSession = {
   gatewayOrderId: string;
   paymentLinkId: string;
   amount: number;
+  keyId: string;
   qrDataUrl: string;
   shortUrl: string;
   upiIntentUrl?: string;
   expiresAt: number;
 };
+
+declare global {
+  interface Window {
+    Razorpay?: any;
+  }
+}
 
 function AddFundsPage() {
   const [amount, setAmount] = useState("1");
@@ -71,12 +76,23 @@ function AddFundsPage() {
   const queryClient = useQueryClient();
   const fetchTopups = useServerFn(listMyTopups);
   const startTopup = useServerFn(createWalletTopup);
+  const verifyTopup = useServerFn(verifyWalletTopup);
   const checkTopup = useServerFn(checkWalletTopup);
 
   const fmt = useMemo(() => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }), []);
   const amt = Math.max(0, Number(amount) || 0);
 
   const topups = useQuery({ queryKey: ["my-topups"], queryFn: () => fetchTopups({}) });
+
+  // Load Razorpay official Checkout SDK
+  useEffect(() => {
+    if (typeof window !== "undefined" && !window.Razorpay) {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
   const amountError =
     amount !== "" && (amt < MIN_AMOUNT || amt > MAX_AMOUNT)
@@ -102,6 +118,16 @@ function AddFundsPage() {
     return () => clearInterval(interval);
   }, [activeSession, paymentSuccess]);
 
+  // Handle successful credit
+  const handleCreditSuccess = useCallback(
+    async (creditAmt: number) => {
+      setPaymentSuccess(true);
+      toast.success(`🎉 Payment of ₹${fmt.format(creditAmt)} received! Added to wallet.`);
+      await queryClient.invalidateQueries();
+    },
+    [fmt, queryClient]
+  );
+
   // Poll for payment completion when QR session is active
   useEffect(() => {
     if (!activeSession || paymentSuccess || timeLeft <= 0) return;
@@ -110,9 +136,7 @@ function AddFundsPage() {
       try {
         const res = await checkTopup({ data: { paymentOrderId: activeSession.paymentOrderId } });
         if (res.status === "paid") {
-          setPaymentSuccess(true);
-          toast.success(`🎉 Payment of ₹${fmt.format(activeSession.amount)} received successfully! Added to wallet.`);
-          await queryClient.invalidateQueries();
+          handleCreditSuccess(activeSession.amount);
           clearInterval(pollTimer);
         }
       } catch {
@@ -121,7 +145,62 @@ function AddFundsPage() {
     }, 2500);
 
     return () => clearInterval(pollTimer);
-  }, [activeSession, paymentSuccess, timeLeft, checkTopup, queryClient, fmt]);
+  }, [activeSession, paymentSuccess, timeLeft, checkTopup, handleCreditSuccess]);
+
+  // Launch official Razorpay Checkout with Dynamic UPI QR
+  const openRazorpayCheckout = useCallback(
+    (session: ActiveQRSession) => {
+      if (typeof window === "undefined" || !window.Razorpay) {
+        // Fallback: open hosted payment link
+        window.open(session.shortUrl, "_blank");
+        return;
+      }
+
+      try {
+        const rzp = new window.Razorpay({
+          key: session.keyId,
+          amount: Math.round(session.amount * 100),
+          currency: "INR",
+          name: "GrowMeSMM",
+          description: `Wallet Top-Up ₹${session.amount}`,
+          order_id: session.gatewayOrderId,
+          prefill: {
+            name: "GrowMeSMM User",
+            email: "user@growmesmm.in",
+          },
+          theme: {
+            color: "#10b981",
+          },
+          handler: async function (response: any) {
+            try {
+              await verifyTopup({
+                data: {
+                  paymentOrderId: session.paymentOrderId,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpaySignature: response.razorpay_signature,
+                },
+              });
+              handleCreditSuccess(session.amount);
+            } catch (vErr) {
+              console.warn("Signature verification:", vErr);
+              // Polling will catch it as fallback
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              // User closed modal — QR session remains visible on page with timer
+            },
+          },
+        });
+        rzp.open();
+      } catch (err) {
+        console.error("Razorpay open error:", err);
+        window.open(session.shortUrl, "_blank");
+      }
+    },
+    [verifyTopup, handleCreditSuccess]
+  );
 
   // Generate dynamic QR code
   const handleGenerateQR = async () => {
@@ -133,7 +212,9 @@ function AddFundsPage() {
       const session = await startTopup({ data: { amount: amt } });
       setActiveSession(session);
       setTimeLeft(Math.max(0, Math.floor((session.expiresAt - Date.now()) / 1000)));
-      toast.success(`Dynamic QR generated for ₹${fmt.format(amt)}. Valid for 5 minutes.`);
+      toast.success(`Dynamic UPI QR generated for ₹${fmt.format(amt)}.`);
+      // Auto-open Razorpay's official UPI QR modal
+      openRazorpayCheckout(session);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to generate QR code");
     } finally {
@@ -150,9 +231,8 @@ function AddFundsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.info("QR Code downloaded! Open PhonePe/GPay/Paytm to scan from gallery.");
+    toast.info("QR Code downloaded! Open PhonePe/GPay/Paytm to scan.");
   };
-
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
@@ -242,7 +322,7 @@ function AddFundsPage() {
               >
                 {isGenerating ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating 5-Min Dynamic QR…
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating Dynamic UPI QR…
                   </>
                 ) : (
                   <>
@@ -328,12 +408,10 @@ function AddFundsPage() {
                           <Download className="mr-1.5 h-4 w-4" /> Download QR
                         </Button>
                         <Button
-                          asChild
+                          onClick={() => openRazorpayCheckout(activeSession)}
                           className="h-11 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700"
                         >
-                          <a href={activeSession.shortUrl} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="mr-1.5 h-4 w-4" /> Open & Pay
-                          </a>
+                          <ExternalLink className="mr-1.5 h-4 w-4" /> Open Official UPI QR
                         </Button>
                       </div>
 
@@ -368,13 +446,13 @@ function AddFundsPage() {
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
                   2
                 </span>
-                <span>Open GPay, PhonePe, Paytm or BHIM UPI and scan the QR code (or download to scan from gallery).</span>
+                <span>Official UPI QR code opens with PhonePe, Google Pay, Paytm, BHIM options.</span>
               </li>
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
                   3
                 </span>
-                <span>Complete the payment within <strong>5 minutes</strong>.</span>
+                <span>Complete payment within <strong>5 minutes</strong>.</span>
               </li>
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
@@ -389,10 +467,10 @@ function AddFundsPage() {
             </div>
           </Card>
 
-          {/* Top-up History Passbook */}
+          {/* Top-up History Passbook (Only Successful Payments) */}
           <Card className="glass border-border/60 p-5 shadow-card">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Recent Top-Ups</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Successful Top-Ups</h2>
               <button
                 onClick={() => queryClient.invalidateQueries({ queryKey: ["my-topups"] })}
                 className="text-xs font-medium text-muted-foreground hover:text-foreground"
@@ -403,7 +481,7 @@ function AddFundsPage() {
             <div className="mt-4 space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
               {topups.isLoading && <p className="text-xs text-muted-foreground">Loading passbook…</p>}
               {!topups.isLoading && (topups.data?.length ?? 0) === 0 && (
-                <p className="py-6 text-center text-xs text-muted-foreground">No top-ups yet. Your payments will appear here.</p>
+                <p className="py-6 text-center text-xs text-muted-foreground">No completed top-ups yet.</p>
               )}
               {topups.data?.map((p) => (
                 <div
@@ -427,19 +505,9 @@ function AddFundsPage() {
                     <span className="rounded-lg bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-400">
                       ₹{fmt.format(Number(p.amount))}
                     </span>
-                    {p.status === "paid" ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Paid
-                      </span>
-                    ) : p.status === "failed" ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-destructive">
-                        <XCircle className="h-3.5 w-3.5" /> Failed
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Pending
-                      </span>
-                    )}
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Paid
+                    </span>
                   </div>
                 </div>
               ))}
