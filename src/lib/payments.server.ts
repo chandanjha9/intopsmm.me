@@ -1,6 +1,7 @@
 import sql from "mssql";
 import { poolConnect } from "@/integrations/sqlServer/client";
 import QRCode from "qrcode";
+import { sendTelegramPaymentAlert } from "./telegram.server";
 
 export type TopupSession = {
   paymentOrderId: string;
@@ -71,9 +72,9 @@ export async function createTopupSession(userId: string, amount: number): Promis
 }
 
 /**
- * Verifies the 12-digit UPI UTR / Transaction ID and credits the user wallet instantly.
+ * Submits the 12-digit UPI UTR / Transaction ID and notifies Admin on Telegram with 1-Click Approve/Reject buttons.
  */
-export async function verifyAndCreditUtr(
+export async function submitUtrForVerification(
   userId: string,
   params: {
     paymentOrderId: string;
@@ -87,21 +88,26 @@ export async function verifyAndCreditUtr(
 
   const db = await poolConnect;
 
-  // Check if UTR was already used
+  // Check if UTR was already approved on another order
   const checkDuplicate = await db
     .request()
     .input("utr", sql.NVarChar, cleanUtr)
     .query("SELECT id FROM payment_orders WHERE gateway_payment_id = @utr AND status = 'paid'");
 
   if (checkDuplicate.recordset.length > 0) {
-    throw new Error("This UTR / Transaction ID has already been credited.");
+    throw new Error("This UTR / Transaction ID has already been used and credited.");
   }
 
-  // Fetch payment order
+  // Fetch payment order and user email
   const orderRes = await db
     .request()
     .input("id", sql.UniqueIdentifier, params.paymentOrderId)
-    .query("SELECT id, user_id, amount, gateway_order_id, status FROM payment_orders WHERE id = @id");
+    .query(`
+      SELECT p.id, p.user_id, p.amount, p.gateway_order_id, p.status, u.email
+      FROM payment_orders p
+      INNER JOIN profiles u ON p.user_id = u.id
+      WHERE p.id = @id
+    `);
 
   const record = orderRes.recordset[0];
   if (!record || record.user_id !== userId) {
@@ -109,22 +115,26 @@ export async function verifyAndCreditUtr(
   }
 
   if (record.status === "paid") {
-    return { success: true, amount: Number(record.amount) };
+    return { status: "paid" as const, amount: Number(record.amount) };
   }
 
-  const amount = Number(record.amount);
-
-  // Credit wallet atomically via Stored Procedure
+  // Update order status to 'under_review' with submitted UTR
   await db
     .request()
-    .input("gateway", sql.NVarChar, "upi_qr")
-    .input("gatewayOrderId", sql.NVarChar, record.gateway_order_id)
-    .input("gatewayPaymentId", sql.NVarChar, cleanUtr)
-    .input("amount", sql.Decimal(18, 4), amount)
-    .output("success", sql.Bit)
-    .execute("sp_credit_wallet_from_payment");
+    .input("id", sql.UniqueIdentifier, params.paymentOrderId)
+    .input("utr", sql.NVarChar, cleanUtr)
+    .query("UPDATE payment_orders SET gateway_payment_id = @utr, status = 'under_review', updated_at = SYSDATETIMEOFFSET() WHERE id = @id");
 
-  return { success: true, amount };
+  // Send instant push notification to Admin Telegram
+  sendTelegramPaymentAlert({
+    paymentOrderId: params.paymentOrderId,
+    orderRef: record.gateway_order_id,
+    userEmail: record.email,
+    amount: Number(record.amount),
+    utrNumber: cleanUtr,
+  }).catch((err) => console.error("[telegram] Alert error:", err));
+
+  return { status: "under_review" as const, amount: Number(record.amount) };
 }
 
 /**

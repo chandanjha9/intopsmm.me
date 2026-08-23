@@ -19,10 +19,9 @@ import {
   RefreshCw,
   Sparkles,
   ExternalLink,
-  ArrowRight,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { createWalletTopup, submitUpiUtr, listMyTopups } from "@/lib/payments.functions";
+import { createWalletTopup, submitUpiUtr, checkWalletTopup, listMyTopups } from "@/lib/payments.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
@@ -67,12 +66,14 @@ function AddFundsPage() {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [utrNumber, setUtrNumber] = useState("");
   const [isVerifyingUtr, setIsVerifyingUtr] = useState(false);
+  const [isUnderReview, setIsUnderReview] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const queryClient = useQueryClient();
   const fetchTopups = useServerFn(listMyTopups);
   const startTopup = useServerFn(createWalletTopup);
   const verifyUtr = useServerFn(submitUpiUtr);
+  const checkTopup = useServerFn(checkWalletTopup);
 
   const fmt = useMemo(() => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }), []);
   const amt = Math.max(0, Number(amount) || 0);
@@ -103,11 +104,38 @@ function AddFundsPage() {
     return () => clearInterval(interval);
   }, [activeSession, paymentSuccess]);
 
+  // Real-time polling when under review or active
+  useEffect(() => {
+    if (!activeSession || paymentSuccess) return;
+
+    const pollTimer = setInterval(async () => {
+      try {
+        const res = await checkTopup({ data: { paymentOrderId: activeSession.paymentOrderId } });
+        if (res.status === "paid") {
+          setPaymentSuccess(true);
+          setIsUnderReview(false);
+          toast.success(`🎉 Payment of ₹${fmt.format(activeSession.amount)} Approved & Added to Wallet!`);
+          await queryClient.invalidateQueries();
+          clearInterval(pollTimer);
+        } else if (res.status === "failed") {
+          setIsUnderReview(false);
+          toast.error("Payment rejected by Admin (Invalid UTR number).");
+          clearInterval(pollTimer);
+        }
+      } catch {
+        // Keep polling
+      }
+    }, 2500);
+
+    return () => clearInterval(pollTimer);
+  }, [activeSession, paymentSuccess, checkTopup, queryClient, fmt]);
+
   // Generate dynamic QR code
   const handleGenerateQR = async () => {
     if (!canGenerate) return;
     setIsGenerating(true);
     setPaymentSuccess(false);
+    setIsUnderReview(false);
     setUtrNumber("");
 
     try {
@@ -122,7 +150,7 @@ function AddFundsPage() {
     }
   };
 
-  // Submit & Verify UTR
+  // Submit UTR
   const handleVerifyUtr = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!activeSession || !utrNumber.trim()) {
@@ -139,11 +167,10 @@ function AddFundsPage() {
         },
       });
 
-      setPaymentSuccess(true);
-      toast.success(`🎉 Payment of ₹${fmt.format(activeSession.amount)} verified & added to wallet!`);
-      await queryClient.invalidateQueries();
+      setIsUnderReview(true);
+      toast.info("⏳ UTR Submitted! Alert sent to Admin for instant 1-click verification.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to verify UTR. Please check the number and try again.");
+      toast.error(err instanceof Error ? err.message : "Failed to submit UTR. Please check and try again.");
     } finally {
       setIsVerifyingUtr(false);
     }
@@ -268,14 +295,15 @@ function AddFundsPage() {
                       <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
                         <CheckCircle2 className="h-10 w-10 animate-bounce" />
                       </div>
-                      <h3 className="text-xl font-bold text-emerald-400">Payment Successful! 🎉</h3>
+                      <h3 className="text-xl font-bold text-emerald-400">Payment Approved & Added! 🎉</h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        ₹{fmt.format(activeSession.amount)} has been credited to your wallet instantly.
+                        ₹{fmt.format(activeSession.amount)} has been credited to your wallet balance.
                       </p>
                       <Button
                         onClick={() => {
                           setActiveSession(null);
                           setPaymentSuccess(false);
+                          setIsUnderReview(false);
                           setUtrNumber("");
                         }}
                         className="mt-4 rounded-xl bg-emerald-500 font-semibold text-white hover:bg-emerald-600"
@@ -359,25 +387,38 @@ function AddFundsPage() {
                             onChange={(e) => setUtrNumber(e.target.value.replace(/[^0-9A-Za-z]/g, ""))}
                             placeholder="e.g. 423589123456"
                             maxLength={22}
+                            disabled={isUnderReview}
                             className="h-11 rounded-xl border-emerald-500/40 bg-background/90 text-sm font-mono tracking-wider font-bold"
                           />
                         </div>
 
-                        <Button
-                          type="submit"
-                          disabled={!utrNumber.trim() || isVerifyingUtr}
-                          className="h-12 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 font-bold text-sm text-white shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-teal-700"
-                        >
-                          {isVerifyingUtr ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying & Adding Funds…
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle2 className="mr-2 h-4 w-4" /> Verify & Add to Wallet
-                            </>
-                          )}
-                        </Button>
+                        {isUnderReview ? (
+                          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-center space-y-1.5">
+                            <div className="flex items-center justify-center gap-2 text-xs font-bold text-amber-400">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Verifying Payment with Admin…
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              Request sent to Admin Telegram. Your wallet will update automatically once verified.
+                            </p>
+                          </div>
+                        ) : (
+                          <Button
+                            type="submit"
+                            disabled={!utrNumber.trim() || isVerifyingUtr}
+                            className="h-12 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 font-bold text-sm text-white shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-teal-700"
+                          >
+                            {isVerifyingUtr ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting UTR…
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="mr-2 h-4 w-4" /> Submit UTR for Instant Credit
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </form>
                     </div>
                   )}
@@ -417,12 +458,12 @@ function AddFundsPage() {
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
                   4
                 </span>
-                <span>Enter the <strong>12-digit UTR / UPI Ref ID</strong> and click <strong>Verify</strong> to credit wallet instantly.</span>
+                <span>Enter the <strong>12-digit UTR / UPI Ref ID</strong> and submit for 1-click Admin verification.</span>
               </li>
             </ol>
             <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-500/10 p-3 text-[11px] font-medium text-emerald-400">
               <ShieldCheck className="h-4 w-4 shrink-0" />
-              Direct 256-bit encrypted UPI instant payment gateway.
+              Direct 256-bit encrypted UPI instant payment gateway with Telegram admin verification.
             </div>
           </Card>
 

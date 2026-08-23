@@ -3,7 +3,7 @@ import { z } from "zod";
 import sql from "mssql";
 import { poolConnect } from "@/integrations/sqlServer/client";
 import { requireAuth } from "./auth/auth-middleware";
-import { createTopupSession, getTopupStatus, verifyAndCreditUtr } from "./payments.server";
+import { createTopupSession, getTopupStatus, submitUtrForVerification } from "./payments.server";
 
 const amountSchema = z.object({
   amount: z.number().positive().min(1, "Minimum top-up is ₹1").max(200000),
@@ -25,7 +25,7 @@ export const submitUpiUtr = createServerFn({ method: "POST" })
   .middleware([requireAuth])
   .inputValidator((input: unknown) => utrSchema.parse(input))
   .handler(async ({ data, context }) =>
-    verifyAndCreditUtr(context.userId, {
+    submitUtrForVerification(context.userId, {
       paymentOrderId: data.paymentOrderId,
       utrNumber: data.utrNumber,
     })
