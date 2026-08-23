@@ -1,24 +1,26 @@
-import sql from 'mssql/msnodesqlv8.js';
+import sql from 'mssql';
 import * as dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
-const host = process.env.SQLSERVER_HOST || '(localdb)\\MSSQLLocalDB';
-const database = process.env.SQLSERVER_DATABASE || 'GrowMeSMM';
-const user = process.env.SQLSERVER_USER || '';
-const password = process.env.SQLSERVER_PASSWORD || '';
-const port = process.env.SQLSERVER_PORT || '1433';
-const encrypt = process.env.SQLSERVER_ENCRYPT === 'true';
+const server = process.env.SQLSERVER_HOST || '180.151.91.194';
+const port = parseInt(process.env.SQLSERVER_PORT || '50210', 10);
+const user = process.env.SQLSERVER_USER || 'wspl';
+const password = process.env.SQLSERVER_PASSWORD || 'TE-B}x]u';
+const database = process.env.SQLSERVER_DATABASE || 'WaydineQA';
 
-let connectionString = '';
-if (host.toLowerCase().includes('(localdb)')) {
-  connectionString = `Driver={ODBC Driver 18 for SQL Server};Server=${host};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;`;
-} else if (user && password) {
-  connectionString = `Driver={ODBC Driver 18 for SQL Server};Server=${host},${port};Database=${database};Uid=${user};Pwd=${password};Encrypt=${encrypt ? 'yes' : 'no'};TrustServerCertificate=yes;`;
-} else {
-  connectionString = `Driver={ODBC Driver 18 for SQL Server};Server=${host},${port};Database=${database};Trusted_Connection=yes;TrustServerCertificate=yes;`;
-}
+const config = {
+  server,
+  port,
+  user,
+  password,
+  database,
+  options: {
+    encrypt: false,
+    trustServerCertificate: true,
+  },
+};
 
 async function createAccount(pool, { email, plainPassword, username, fullName, role, walletBalance }) {
   const hash = await bcrypt.hash(plainPassword, 10);
@@ -31,14 +33,12 @@ async function createAccount(pool, { email, plainPassword, username, fullName, r
   let userId;
   if (existing.recordset.length > 0) {
     userId = existing.recordset[0].id;
-    // Update password hash
     await pool.request()
       .input('id', sql.UniqueIdentifier, userId)
       .input('hash', sql.NVarChar, hash)
       .query('UPDATE users SET password_hash = @hash, updated_at = SYSDATETIMEOFFSET() WHERE id = @id');
     console.log(`Updated existing user: ${email}`);
   } else {
-    // Insert new user
     const insertRes = await pool.request()
       .input('email', sql.NVarChar, email)
       .input('hash', sql.NVarChar, hash)
@@ -85,8 +85,8 @@ async function createAccount(pool, { email, plainPassword, username, fullName, r
 }
 
 async function seed() {
-  console.log(`Connecting to SQL Server [${host}] database [${database}]...`);
-  const pool = new sql.ConnectionPool({ connectionString });
+  console.log(`Connecting to SQL Server [${server}:${port}] database [${database}]...`);
+  const pool = new sql.ConnectionPool(config);
   await pool.connect();
   console.log('Connected to SQL Server successfully!\n');
 
@@ -111,7 +111,7 @@ async function seed() {
   });
 
   await pool.close();
-  console.log('\n✅ Admin and User credentials seeded successfully!');
+  console.log('\n✅ Admin and User credentials seeded successfully into ' + database + '!');
 }
 
 seed().catch((err) => {
