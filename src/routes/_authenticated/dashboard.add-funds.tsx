@@ -412,20 +412,22 @@ function AddFundsPage() {
                         </p>
                         <p className="text-3xl font-black text-foreground">₹{fmt.format(activeSession.amount)}</p>
 
-                        {/* 1-Click Copy UPI ID Box */}
-                        <div className="mx-auto flex max-w-sm items-center justify-between gap-2 rounded-xl border border-emerald-500/40 bg-background/80 p-2 pl-3">
+                        {/* 1-Click Copy UPI ID Box (Method 1 - Most Reliable) */}
+                        <div className="mx-auto flex max-w-md items-center justify-between gap-2 rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-3">
                           <div className="min-w-0 text-left">
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground">UPI ID (VPA)</p>
+                            <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                              Method 1: Copy UPI ID (Recommended)
+                            </p>
                             <p className="truncate font-mono text-sm font-bold text-foreground">{activeSession.upiVpa}</p>
                           </div>
                           <Button
                             type="button"
                             size="sm"
                             onClick={handleCopyVpa}
-                            className={`h-9 shrink-0 rounded-lg text-xs font-bold transition ${
+                            className={`h-9 shrink-0 rounded-lg text-xs font-bold transition shadow-sm ${
                               copiedVpa
                                 ? "bg-emerald-600 text-white"
-                                : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                                : "bg-emerald-600 text-white hover:bg-emerald-700"
                             }`}
                           >
                             {copiedVpa ? (
@@ -450,7 +452,7 @@ function AddFundsPage() {
                             onClick={handleDownloadQR}
                             className="h-11 rounded-xl border-border/80 text-xs font-bold"
                           >
-                            <Download className="mr-1.5 h-4 w-4 text-emerald-400" /> Download QR
+                            <Download className="mr-1.5 h-4 w-4 text-emerald-500" /> Download QR
                           </Button>
 
                           <Button
@@ -458,39 +460,28 @@ function AddFundsPage() {
                             className="h-11 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700 shadow-glow"
                           >
                             <a href={activeSession.upiIntentUrl}>
-                              <ExternalLink className="mr-1.5 h-4 w-4" /> Open Any UPI App
+                              <ExternalLink className="mr-1.5 h-4 w-4" /> Open UPI App
                             </a>
                           </Button>
                         </div>
-
-                        {/* Direct App Deep Links */}
-                        <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
-                          <a
-                            href={`phonepe://pay?pa=${activeSession.upiVpa}&pn=Intopsmm&am=${activeSession.amount.toFixed(2)}&cu=INR`}
-                            className="rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-secondary transition"
-                          >
-                            📱 PhonePe
-                          </a>
-                          <a
-                            href={`paytmmp://pay?pa=${activeSession.upiVpa}&pn=Intopsmm&am=${activeSession.amount.toFixed(2)}&cu=INR`}
-                            className="rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-secondary transition"
-                          >
-                            📱 Paytm
-                          </a>
-                          <a
-                            href={`gpay://upi/pay?pa=${activeSession.upiVpa}&pn=Intopsmm&am=${activeSession.amount.toFixed(2)}&cu=INR`}
-                            className="rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-secondary transition"
-                          >
-                            📱 Google Pay
-                          </a>
-                        </div>
                       </div>
 
-                      {/* Security Decline Helper Tip */}
-                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left">
-                        <p className="text-[11px] leading-relaxed text-amber-200">
-                          <strong>💡 App me Decline Error aaye?</strong> Agar PhonePe/GPay me <em>&quot;Declined for security reason&quot;</em> error aaye, to upar diya gaya <strong>Copy UPI ID</strong> button dabayein aur direct PhonePe/GPay me transfer karein, ya <strong>Download QR</strong> karke scanner me upload karein.
+                      {/* High-Contrast Clear Instruction Box */}
+                      <div className="rounded-xl border border-amber-500/50 bg-amber-50 dark:bg-amber-950/40 p-3.5 text-left shadow-sm">
+                        <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                          📌 PhonePe / Google Pay se Payment Kaise Karein:
                         </p>
+                        <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[11px] font-medium leading-relaxed text-amber-950 dark:text-amber-100">
+                          <li>
+                            Upar <strong>&quot;Copy UPI ID&quot;</strong> button dabayein.
+                          </li>
+                          <li>
+                            Apna <strong>PhonePe, Google Pay ya Paytm</strong> open karein aur <strong>&quot;To UPI ID&quot;</strong> me paste karke <strong>₹{fmt.format(activeSession.amount)}</strong> send karein.
+                          </li>
+                          <li>
+                            Payment ho jane ke baad receipt se <strong>12-digit UPI UTR / Ref No.</strong> copy karein aur neeche submit karein.
+                          </li>
+                        </ol>
                       </div>
 
                       {/* UTR Verification Section */}
