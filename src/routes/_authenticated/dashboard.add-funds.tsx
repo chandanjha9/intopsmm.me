@@ -444,26 +444,15 @@ function AddFundsPage() {
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="space-y-2.5">
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleDownloadQR}
-                            className="h-11 rounded-xl border-border/80 text-xs font-bold"
-                          >
-                            <Download className="mr-1.5 h-4 w-4 text-emerald-500" /> Download QR
-                          </Button>
-
-                          <Button
-                            asChild
-                            className="h-11 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700 shadow-glow"
-                          >
-                            <a href={activeSession.upiIntentUrl}>
-                              <ExternalLink className="mr-1.5 h-4 w-4" /> Open UPI App
-                            </a>
-                          </Button>
-                        </div>
+                      <div className="mx-auto max-w-md">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleDownloadQR}
+                          className="h-12 w-full rounded-xl border-emerald-500/30 bg-background text-sm font-bold shadow-sm hover:bg-secondary"
+                        >
+                          <Download className="mr-2 h-4 w-4 text-emerald-500" /> Download QR Code Image
+                        </Button>
                       </div>
 
                       {/* High-Contrast Clear Instruction Box */}
