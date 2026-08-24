@@ -128,6 +128,17 @@ export async function handleTelegramWebhook(update: any) {
     const callbackId = callbackQuery.id;
     const messageId = callbackQuery.message?.message_id;
     const chatId = callbackQuery.message?.chat?.id;
+    const fromId = callbackQuery.from?.id;
+
+    // Security Check: Strictly authorize only the configured Admin Chat ID
+    const senderId = String(fromId || chatId || "");
+    if (senderId !== String(TELEGRAM_ADMIN_CHAT_ID)) {
+      console.warn(`[telegram security alert] Blocked unauthorized attempt from sender ID: ${senderId}`);
+      if (callbackId) {
+        await answerCallbackQuery(callbackId, "⛔ Access Denied: You are not authorized to perform admin actions.");
+      }
+      return new Response("Unauthorized", { status: 403 });
+    }
 
     const db = await poolConnect;
 
