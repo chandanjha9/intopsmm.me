@@ -27,8 +27,8 @@ export async function createTopupSession(userId: string, amount: number): Promis
   const orderRef = `GMSMM${Date.now().toString().slice(-8)}`;
   const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
 
-  // Pure standard UPI Deep-Link specification (accepted by all UPI apps without any browser redirects)
-  const upiIntentUrl = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(upiName)}&am=${amount.toFixed(2)}&tr=${orderRef}&cu=INR&tn=${encodeURIComponent(`Topup ${orderRef}`)}`;
+  // Pure standard compliant UPI Deep-Link specification (avoids NPCI/Bank security block on P2P VPAs)
+  const upiIntentUrl = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(upiName)}&am=${amount.toFixed(2)}&cu=INR`;
 
   // Generate high-resolution QR Code image
   const qrDataUrl = await QRCode.toDataURL(upiIntentUrl, {

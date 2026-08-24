@@ -20,6 +20,8 @@ import {
   Sparkles,
   ExternalLink,
   AlertCircle,
+  Copy,
+  Check,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuth } from "@/hooks/use-auth";
@@ -72,6 +74,7 @@ function AddFundsPage() {
   const [isRejected, setIsRejected] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [copiedVpa, setCopiedVpa] = useState(false);
 
   const { refreshProfile } = useAuth();
   const queryClient = useQueryClient();
@@ -79,6 +82,14 @@ function AddFundsPage() {
   const startTopup = useServerFn(createWalletTopup);
   const verifyUtr = useServerFn(submitUpiUtr);
   const checkTopup = useServerFn(checkWalletTopup);
+
+  const handleCopyVpa = () => {
+    if (!activeSession?.upiVpa) return;
+    void navigator.clipboard.writeText(activeSession.upiVpa);
+    setCopiedVpa(true);
+    toast.success("UPI ID copied! Open PhonePe/GPay/Paytm and send to this UPI ID.");
+    setTimeout(() => setCopiedVpa(false), 3000);
+  };
 
   const fmt = useMemo(() => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }), []);
   const amt = Math.max(0, Number(amount) || 0);
@@ -395,31 +406,91 @@ function AddFundsPage() {
                       </div>
 
                       {/* Amount Details */}
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                           Pay Exact Amount
                         </p>
                         <p className="text-3xl font-black text-foreground">₹{fmt.format(activeSession.amount)}</p>
-                        <p className="text-xs text-muted-foreground">UPI ID: <span className="font-mono font-semibold text-foreground">{activeSession.upiVpa}</span></p>
+
+                        {/* 1-Click Copy UPI ID Box */}
+                        <div className="mx-auto flex max-w-sm items-center justify-between gap-2 rounded-xl border border-emerald-500/40 bg-background/80 p-2 pl-3">
+                          <div className="min-w-0 text-left">
+                            <p className="text-[10px] uppercase font-bold text-muted-foreground">UPI ID (VPA)</p>
+                            <p className="truncate font-mono text-sm font-bold text-foreground">{activeSession.upiVpa}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleCopyVpa}
+                            className={`h-9 shrink-0 rounded-lg text-xs font-bold transition ${
+                              copiedVpa
+                                ? "bg-emerald-600 text-white"
+                                : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                            }`}
+                          >
+                            {copiedVpa ? (
+                              <>
+                                <Check className="mr-1 h-3.5 w-3.5" /> Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="mr-1 h-3.5 w-3.5" /> Copy UPI ID
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <Button
-                          variant="outline"
-                          onClick={handleDownloadQR}
-                          className="h-11 rounded-xl border-border/80 text-xs font-bold"
-                        >
-                          <Download className="mr-1.5 h-4 w-4" /> Download QR
-                        </Button>
-                        <Button
-                          asChild
-                          className="h-11 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700"
-                        >
-                          <a href={activeSession.upiIntentUrl}>
-                            <ExternalLink className="mr-1.5 h-4 w-4" /> Pay via App
+                      <div className="space-y-2.5">
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleDownloadQR}
+                            className="h-11 rounded-xl border-border/80 text-xs font-bold"
+                          >
+                            <Download className="mr-1.5 h-4 w-4 text-emerald-400" /> Download QR
+                          </Button>
+
+                          <Button
+                            asChild
+                            className="h-11 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700 shadow-glow"
+                          >
+                            <a href={activeSession.upiIntentUrl}>
+                              <ExternalLink className="mr-1.5 h-4 w-4" /> Open Any UPI App
+                            </a>
+                          </Button>
+                        </div>
+
+                        {/* Direct App Deep Links */}
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+                          <a
+                            href={`phonepe://pay?pa=${activeSession.upiVpa}&pn=Intopsmm&am=${activeSession.amount.toFixed(2)}&cu=INR`}
+                            className="rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-secondary transition"
+                          >
+                            📱 PhonePe
                           </a>
-                        </Button>
+                          <a
+                            href={`paytmmp://pay?pa=${activeSession.upiVpa}&pn=Intopsmm&am=${activeSession.amount.toFixed(2)}&cu=INR`}
+                            className="rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-secondary transition"
+                          >
+                            📱 Paytm
+                          </a>
+                          <a
+                            href={`gpay://upi/pay?pa=${activeSession.upiVpa}&pn=Intopsmm&am=${activeSession.amount.toFixed(2)}&cu=INR`}
+                            className="rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-secondary transition"
+                          >
+                            📱 Google Pay
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Security Decline Helper Tip */}
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left">
+                        <p className="text-[11px] leading-relaxed text-amber-200">
+                          <strong>💡 App me Decline Error aaye?</strong> Agar PhonePe/GPay me <em>&quot;Declined for security reason&quot;</em> error aaye, to upar diya gaya <strong>Copy UPI ID</strong> button dabayein aur direct PhonePe/GPay me transfer karein, ya <strong>Download QR</strong> karke scanner me upload karein.
+                        </p>
                       </div>
 
                       {/* UTR Verification Section */}
