@@ -455,23 +455,7 @@ function AddFundsPage() {
                         </Button>
                       </div>
 
-                      {/* High-Contrast Clear Instruction Box */}
-                      <div className="rounded-xl border border-amber-500/50 bg-amber-50 dark:bg-amber-950/40 p-3.5 text-left shadow-sm">
-                        <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                          📌 PhonePe / Google Pay se Payment Kaise Karein:
-                        </p>
-                        <ol className="mt-1.5 list-decimal space-y-1 pl-4 text-[11px] font-medium leading-relaxed text-amber-950 dark:text-amber-100">
-                          <li>
-                            Upar <strong>&quot;Copy UPI ID&quot;</strong> button dabayein.
-                          </li>
-                          <li>
-                            Apna <strong>PhonePe, Google Pay ya Paytm</strong> open karein aur <strong>&quot;To UPI ID&quot;</strong> me paste karke <strong>₹{fmt.format(activeSession.amount)}</strong> send karein.
-                          </li>
-                          <li>
-                            Payment ho jane ke baad receipt se <strong>12-digit UPI UTR / Ref No.</strong> copy karein aur neeche submit karein.
-                          </li>
-                        </ol>
-                      </div>
+
 
                       {/* UTR Verification Section */}
                       <form onSubmit={handleVerifyUtr} className="pt-3 border-t border-border/40 space-y-3">
