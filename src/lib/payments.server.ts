@@ -21,7 +21,7 @@ export type TopupSession = {
 export async function createTopupSession(userId: string, amount: number): Promise<TopupSession> {
   const db = await poolConnect;
 
-  const upiVpa = process.env.UPI_VPA || "chandanjha45@ybl";
+  const upiVpa = process.env.UPI_VPA || "chandankrjha45@pingpay";
   const upiName = process.env.UPI_NAME || "Intopsmm";
 
   const orderRef = `GMSMM${Date.now().toString().slice(-8)}`;

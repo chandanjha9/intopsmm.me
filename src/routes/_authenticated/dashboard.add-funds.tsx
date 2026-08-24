@@ -47,8 +47,8 @@ export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
   component: AddFundsPage,
 });
 
-const QUICK_AMOUNTS = [1, 10, 100, 250, 500, 1000];
-const MIN_AMOUNT = 1;
+const QUICK_AMOUNTS = [15, 50, 100, 250, 500, 1000];
+const MIN_AMOUNT = 15;
 const MAX_AMOUNT = 200000;
 
 type ActiveQRSession = {
@@ -63,7 +63,7 @@ type ActiveQRSession = {
 };
 
 function AddFundsPage() {
-  const [amount, setAmount] = useState("1");
+  const [amount, setAmount] = useState("15");
   const [agreed, setAgreed] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeSession, setActiveSession] = useState<ActiveQRSession | null>(null);
