@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,23 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Wallet,
-  ShieldCheck,
   Loader2,
   CheckCircle2,
-  XCircle,
   Download,
   QrCode,
-  Clock,
-  RefreshCw,
   Sparkles,
-  ExternalLink,
-  AlertCircle,
   Copy,
   Check,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuth } from "@/hooks/use-auth";
-import { submitStaticUpiPayment, fetchStaticQrCode, listMyTopups } from "@/lib/payments.functions";
+import { submitStaticUpiPayment } from "@/lib/payments.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
@@ -50,6 +44,8 @@ export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
 const QUICK_AMOUNTS = [15, 50, 100, 250, 500, 1000];
 const MIN_AMOUNT = 15;
 const MAX_AMOUNT = 200000;
+const STATIC_UPI_VPA = "chandankrjha45@pingpay";
+const STATIC_UPI_NAME = "CHANDAN KUMAR JHA";
 
 function AddFundsPage() {
   const [amount, setAmount] = useState("15");
@@ -60,42 +56,16 @@ function AddFundsPage() {
 
   const { refreshProfile } = useAuth();
   const queryClient = useQueryClient();
-  
-  const fetchTopups = useServerFn(listMyTopups);
+
   const submitStaticPayment = useServerFn(submitStaticUpiPayment);
-  const getQrCode = useServerFn(fetchStaticQrCode);
 
   const fmt = useMemo(() => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }), []);
   const amt = Math.max(0, Number(amount) || 0);
-
-  // Load static QR code server-side details on mount
-  const qrQuery = useQuery({
-    queryKey: ["static-qr"],
-    queryFn: () => getQrCode({}),
-  });
-
-  // Query submissions history (Poll every 5 seconds for status changes)
-  const topups = useQuery({
-    queryKey: ["my-topups"],
-    queryFn: () => fetchTopups({}),
-    refetchInterval: 5000,
-  });
 
   // Refresh user balance on mount
   useEffect(() => {
     void refreshProfile();
   }, [refreshProfile]);
-
-  // Balance changes will trigger a profile refresh immediately
-  const lastPaidCount = useMemo(() => {
-    return topups.data?.filter(t => t.status === "paid").length ?? 0;
-  }, [topups.data]);
-
-  useEffect(() => {
-    if (lastPaidCount > 0) {
-      void refreshProfile();
-    }
-  }, [lastPaidCount, refreshProfile]);
 
   const amountError =
     amount !== "" && (amt < MIN_AMOUNT || amt > MAX_AMOUNT)
@@ -106,20 +76,16 @@ function AddFundsPage() {
   const canSubmit = amountReady && agreed && utrNumber.trim().length >= 10 && !isSubmitting;
 
   const handleCopyVpa = () => {
-    const vpa = qrQuery.data?.upiVpa;
-    if (!vpa) return;
-    void navigator.clipboard.writeText(vpa);
+    void navigator.clipboard.writeText(STATIC_UPI_VPA);
     setCopiedVpa(true);
     toast.success("UPI ID copied! Open PhonePe/GPay/Paytm and send to this UPI ID.");
     setTimeout(() => setCopiedVpa(false), 3000);
   };
 
   const handleDownloadQR = () => {
-    const url = qrQuery.data?.qrDataUrl;
-    if (!url) return;
     const link = document.createElement("a");
-    link.href = url;
-    link.download = `Intopsmm-QR.png`;
+    link.href = "/upi-qr.png";
+    link.download = "Intopsmm-UPI-QR.png";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -138,9 +104,10 @@ function AddFundsPage() {
           utrNumber: utrNumber.trim(),
         },
       });
-      toast.success("⏳ Transaction submitted successfully! Admin will verify and credit your wallet shortly.");
+      toast.success("⏳ Transaction submitted! Admin will verify and credit your wallet shortly.");
       setUtrNumber("");
       await queryClient.invalidateQueries({ queryKey: ["my-topups"] });
+      void refreshProfile();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to submit transaction.");
     } finally {
@@ -178,64 +145,45 @@ function AddFundsPage() {
               <QrCode className="h-5 w-5 text-emerald-400" /> Pay using UPI QR Code
             </h2>
 
-            {/* Static QR Code Image Display */}
+            {/* Static QR Code Image — no border/circle, just the image */}
             <div className="flex flex-col items-center justify-center space-y-4">
-              {qrQuery.isLoading ? (
-                <div className="flex h-[240px] w-[240px] items-center justify-center rounded-2xl border-2 border-dashed border-emerald-500/30">
-                  <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
-                </div>
-              ) : qrQuery.data?.qrDataUrl ? (
-                <div className="mx-auto flex aspect-square w-full max-w-[240px] items-center justify-center rounded-2xl border-2 border-emerald-500/40 bg-white p-3 shadow-2xl">
-                  <img
-                    src={qrQuery.data.qrDataUrl}
-                    alt="Intopsmm Static UPI QR"
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-              ) : (
-                <p className="text-xs text-destructive">Failed to load QR code image.</p>
-              )}
+              <img
+                src="/upi-qr.png"
+                alt="Intopsmm UPI QR — CHANDAN KUMAR JHA"
+                className="mx-auto w-full max-w-[280px] object-contain rounded-xl shadow-lg"
+              />
 
-              {/* Copy UPI ID Box */}
-              {!qrQuery.isLoading && qrQuery.data && (
-                <div className="w-full max-w-md flex items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
-                  <div className="min-w-0 text-left">
-                    <p className="text-[10px] font-bold text-emerald-400">UPI ID / VPA</p>
-                    <p className="truncate font-mono text-sm font-bold text-foreground">{qrQuery.data.upiVpa}</p>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleCopyVpa}
-                    className="h-9 shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition shadow-sm"
-                  >
-                    {copiedVpa ? (
-                      <>
-                        <Check className="mr-1 h-3.5 w-3.5" /> Copied
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="mr-1 h-3.5 w-3.5" /> Copy ID
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
+              {/* UPI Name + ID */}
+              <div className="text-center space-y-0.5">
+                <p className="text-sm font-black tracking-wide text-foreground">{STATIC_UPI_NAME}</p>
+                <p className="text-xs text-muted-foreground font-mono">UPI ID: {STATIC_UPI_VPA}</p>
+              </div>
 
-              {!qrQuery.isLoading && qrQuery.data && (
+              {/* Copy UPI ID + Download Row */}
+              <div className="flex flex-wrap items-center justify-center gap-2 w-full max-w-xs">
+                <Button
+                  type="button"
+                  onClick={handleCopyVpa}
+                  className="flex-1 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white shadow-sm"
+                >
+                  {copiedVpa ? (
+                    <><Check className="mr-1.5 h-3.5 w-3.5" /> Copied!</>
+                  ) : (
+                    <><Copy className="mr-1.5 h-3.5 w-3.5" /> Copy UPI ID</>
+                  )}
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   onClick={handleDownloadQR}
-                  className="rounded-lg border-border/85"
+                  className="flex-1 h-9 rounded-xl border-border/70 text-xs font-bold"
                 >
-                  <Download className="mr-1.5 h-3.5 w-3.5 text-emerald-400" /> Download QR Code
+                  <Download className="mr-1.5 h-3.5 w-3.5 text-emerald-400" /> Download QR
                 </Button>
-              )}
+              </div>
             </div>
 
-            {/* Instruction list right below QR */}
+            {/* Payment Instructions */}
             <div className="border-t border-border/40 pt-4">
               <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-emerald-400" /> Payment Instructions
@@ -247,22 +195,25 @@ function AddFundsPage() {
                 </li>
                 <li className="flex gap-2">
                   <span className="font-bold text-emerald-400">2.</span>
-                  <span>Enter the amount you wish to add and complete the transaction.</span>
+                  <span>Enter the amount you wish to add and complete the payment.</span>
                 </li>
                 <li className="flex gap-2">
                   <span className="font-bold text-emerald-400">3.</span>
-                  <span>Go to the transaction history/receipt of your payment app and copy the <strong>12-digit UPI Transaction ID / UTR Number</strong>.</span>
+                  <span>
+                    Open your UPI app's transaction receipt and copy the{" "}
+                    <strong>12-digit UTR / UPI Transaction ID</strong>.
+                  </span>
                 </li>
                 <li className="flex gap-2">
                   <span className="font-bold text-emerald-400">4.</span>
-                  <span>Enter the exact Amount paid and the copied UTR Number below to submit verification.</span>
+                  <span>Enter the exact amount paid and paste the UTR number below, then submit.</span>
                 </li>
               </ul>
             </div>
 
-            {/* Payment Input Form */}
+            {/* Payment Form */}
             <form onSubmit={handleSubmit} className="border-t border-border/40 pt-5 space-y-4">
-              {/* Amount Selection */}
+              {/* Amount */}
               <div className="space-y-2">
                 <Label htmlFor="amount" className="text-sm font-semibold">
                   Amount Paid (₹{MIN_AMOUNT} – ₹{fmt.format(MAX_AMOUNT)})
@@ -301,7 +252,7 @@ function AddFundsPage() {
                 ))}
               </div>
 
-              {/* UTR Input Field */}
+              {/* UTR Number */}
               <div className="space-y-2">
                 <Label htmlFor="utr" className="text-sm font-semibold">
                   12-Digit UPI UTR / Ref Number
@@ -316,7 +267,7 @@ function AddFundsPage() {
                 />
               </div>
 
-              {/* Agreement */}
+              {/* Policy Agreement */}
               <label className="flex cursor-pointer items-start gap-2.5 text-xs text-muted-foreground">
                 <Checkbox checked={agreed} onCheckedChange={(v) => setAgreed(v === true)} className="mt-0.5" />
                 <span>
@@ -324,7 +275,7 @@ function AddFundsPage() {
                 </span>
               </label>
 
-              {/* Submit UTR Verification Button */}
+              {/* Submit */}
               <Button
                 type="submit"
                 variant="hero"
@@ -332,106 +283,41 @@ function AddFundsPage() {
                 disabled={!canSubmit}
               >
                 {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying Submission…
-                  </>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…</>
                 ) : (
-                  <>
-                    <CheckCircle2 className="mr-2 h-4 w-4" /> Submit UTR for Wallet Credit
-                  </>
+                  <><CheckCircle2 className="mr-2 h-4 w-4" /> Submit UTR for Wallet Credit</>
                 )}
               </Button>
             </form>
           </Card>
         </div>
 
-        {/* Right Column: Passbook & Payment Guide */}
+        {/* Right Column: Instructions Card */}
         <div className="space-y-6 lg:col-span-5">
-          {/* Security details */}
-          <Card className="glass border-border/60 p-5 shadow-card space-y-3">
-            <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              <ShieldCheck className="h-4 w-4 text-emerald-400" /> Gateway Security
+          <Card className="glass border-border/60 p-5 shadow-card space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-emerald-400" /> How to Add Funds
             </h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Every transaction submitted is cross-verified automatically with our bank node using the 12-digit transaction ID. Wallet balances are credited immediately upon automated verification. Fake submissions will lock the user account.
-            </p>
-          </Card>
-
-          {/* Submissions/Add Funds Transaction History */}
-          <Card className="glass border-border/60 p-5 shadow-card">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Transaction History</h2>
-              <button
-                onClick={() => queryClient.invalidateQueries({ queryKey: ["my-topups"] })}
-                className="text-xs font-medium text-muted-foreground hover:text-foreground"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <div className="mt-4 space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
-              {topups.isLoading && <p className="text-xs text-muted-foreground">Loading passbook…</p>}
-              
-              {!topups.isLoading && (topups.data?.length ?? 0) === 0 && (
-                <p className="py-6 text-center text-xs text-muted-foreground">No recent transactions.</p>
-              )}
-              
-              {topups.data?.map((p) => {
-                let statusBadge = null;
-                if (p.status === "paid") {
-                  statusBadge = (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Successfully Added Amount
-                    </span>
-                  );
-                } else if (p.status === "under_review") {
-                  statusBadge = (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400">
-                      <Clock className="h-3.5 w-3.5 text-amber-400 animate-pulse" /> Verification Pending
-                    </span>
-                  );
-                } else {
-                  // failed, rejected, canceled
-                  statusBadge = (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-destructive">
-                      <XCircle className="h-3.5 w-3.5" /> Transaction Failed
-                    </span>
-                  );
-                }
-
-                return (
-                  <div
-                    key={p.id}
-                    className="flex flex-col gap-2 rounded-xl border border-border/60 bg-secondary/30 p-3.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-bold font-mono">UTR: {p.gateway_payment_id || "N/A"}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {new Date(p.created_at).toLocaleString("en-IN", {
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      </div>
-                      <span className="rounded-lg bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-400">
-                        ₹{fmt.format(Number(p.amount))}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-1 text-xs mt-1 border-t border-border/20 pt-1.5">
-                      <div className="flex items-center justify-between">
-                        {statusBadge}
-                      </div>
-                      {p.error_message && (
-                        <p className="text-[10px] text-destructive font-medium italic mt-0.5">
-                          Reason: {p.error_message}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+            <ol className="space-y-3 text-xs text-muted-foreground">
+              <li className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400 text-[11px]">1</span>
+                <span>Scan the QR code or copy the UPI ID to make payment via any UPI app.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400 text-[11px]">2</span>
+                <span>After payment, open your UPI app's receipt / transaction history.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400 text-[11px]">3</span>
+                <span>Copy the <strong>12-digit UTR / Transaction ID</strong> from the receipt.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400 text-[11px]">4</span>
+                <span>Enter the amount and UTR number in the form and click Submit. Wallet will be credited after verification.</span>
+              </li>
+            </ol>
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-[11px] text-amber-400 font-medium leading-relaxed">
+              ⚠️ Make sure to enter the correct UTR number. Wrong UTR submissions may result in delayed credit or account suspension.
             </div>
           </Card>
         </div>

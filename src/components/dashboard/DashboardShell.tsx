@@ -93,12 +93,6 @@ export function DashboardShell({ active, children }: { active: string; children:
         <div className="bg-[image:var(--gradient-primary)] p-5 text-primary-foreground">
           <p className="text-xs font-semibold uppercase tracking-widest opacity-90">Wallet Balance</p>
           <p className="mt-1 text-3xl font-bold">{balance}</p>
-          <Link
-            to="/dashboard/add-funds"
-            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold hover:bg-white/30 transition"
-          >
-            <Plus className="h-3 w-3" /> Add Funds
-          </Link>
         </div>
         <div className="p-3">
           <nav className="space-y-1">
@@ -216,15 +210,8 @@ export function DashboardShell({ active, children }: { active: string; children:
             </button>
           </div>
 
-          {/* Desktop: right side username */}
-          <div className="hidden lg:flex ml-auto items-center gap-3">
-            <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background px-3 py-2">
-              <div className="h-7 w-7 rounded-full bg-[image:var(--gradient-primary)] flex items-center justify-center text-primary-foreground">
-                <User className="h-3.5 w-3.5" />
-              </div>
-              <span className="text-sm font-medium">{username}</span>
-            </div>
-          </div>
+          {/* Desktop: spacer */}
+          <div className="hidden lg:flex ml-auto" />
         </div>
       </header>
 
