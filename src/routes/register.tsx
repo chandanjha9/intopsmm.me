@@ -16,8 +16,9 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
-import { BrandingPane } from "./login";
+import { BrandingPane, GoogleMark } from "./login";
 import { useAuth } from "@/hooks/use-auth";
+import { isFirebaseConfigured } from "@/lib/firebase";
 
 const signUpSchema = z.object({
   username: z
@@ -53,10 +54,11 @@ function passwordScore(pw: string) {
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const { session, loading, register } = useAuth();
+  const { session, loading, register, loginWithGoogle } = useAuth();
   const [step, setStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -87,6 +89,27 @@ function RegisterPage() {
       setError(msg);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    setError(null);
+    if (!isFirebaseConfigured) {
+      toast.info("Google Sign-Up is coming soon! Please register with email and password.");
+      return;
+    }
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+      toast.success("Account created with Google!");
+      navigate({ to: "/dashboard", replace: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Google sign-in failed";
+      if (!msg.includes("popup-closed") && !msg.includes("cancelled")) {
+        setError(msg);
+      }
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -141,8 +164,40 @@ function RegisterPage() {
             {step === 3 && "Review and accept our terms to finish."}
           </p>
 
+          {/* Google Sign-Up — only shown on step 1 */}
+          {step === 1 && (
+            <>
+              <Button
+                id="google-register-btn"
+                type="button"
+                variant="outline"
+                size="lg"
+                className="mt-6 w-full gap-2"
+                onClick={handleGoogleSignup}
+                disabled={googleLoading || submitting}
+              >
+                {googleLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <GoogleMark className="h-4 w-4" />
+                )}
+                Continue with Google
+                {!isFirebaseConfigured && (
+                  <span className="ml-auto rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    Coming Soon
+                  </span>
+                )}
+              </Button>
+              <div className="relative my-6 flex items-center gap-3">
+                <div className="flex-1 border-t border-border" />
+                <span className="text-xs text-muted-foreground">or register with email</span>
+                <div className="flex-1 border-t border-border" />
+              </div>
+            </>
+          )}
+
           <form
-            className="mt-8 space-y-4"
+            className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               setError(null);

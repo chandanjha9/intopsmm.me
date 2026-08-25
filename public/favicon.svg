@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="50%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#2563EB" />
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#60A5FA" stop-opacity="0.8" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#059669" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Background Rounded Shield / Tile -->
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#primaryGrad)" filter="url(#shadow)" />
+  
+  <!-- Subtle inner border -->
+  <rect x="36" y="36" width="440" height="440" rx="108" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="4" />
+
+  <!-- Growth Trending Arrow (Iconography) -->
+  <g transform="translate(110, 120)">
+    <!-- Upward Trend Line -->
+    <path
+      d="M20 200 L110 110 L180 180 L280 60"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="36"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <!-- Arrowhead pointing up-right -->
+    <path
+      d="M210 60 L280 60 L280 130"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="36"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <!-- Dots on Data Points -->
+    <circle cx="20" cy="200" r="16" fill="#A7F3D0" />
+    <circle cx="110" cy="110" r="16" fill="#A7F3D0" />
+    <circle cx="180" cy="180" r="16" fill="#A7F3D0" />
+    <circle cx="280" cy="60" r="18" fill="#FFFFFF" />
+  </g>
+</svg>

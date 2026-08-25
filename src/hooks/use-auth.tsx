@@ -1,5 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { loginServerFn, registerServerFn, logoutServerFn, getMeServerFn } from "@/lib/auth/auth.functions";
+import {
+  loginServerFn,
+  registerServerFn,
+  logoutServerFn,
+  getMeServerFn,
+  googleAuthServerFn,
+} from "@/lib/auth/auth.functions";
 import type { UserProfile } from "@/lib/auth/service.server";
 
 export type Profile = UserProfile;
@@ -22,11 +28,25 @@ type AuthContextValue = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, username?: string, fullName?: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+function profileToAuthUser(profile: UserProfile): AuthUser {
+  return {
+    id: profile.id,
+    email: profile.email,
+    role: profile.role,
+    user_metadata: {
+      username: profile.username ?? undefined,
+      full_name: profile.full_name ?? undefined,
+      is_admin: profile.role === "admin",
+    },
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -38,16 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await getMeServerFn();
       if (res?.profile) {
         setProfile(res.profile);
-        setUser({
-          id: res.profile.id,
-          email: res.profile.email,
-          role: res.profile.role,
-          user_metadata: {
-            username: res.profile.username ?? undefined,
-            full_name: res.profile.full_name ?? undefined,
-            is_admin: res.profile.role === "admin",
-          },
-        });
+        setUser(profileToAuthUser(res.profile));
       } else {
         setUser(null);
         setProfile(null);
@@ -68,16 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await loginServerFn({ data: { email, password } });
     if (result?.profile) {
       setProfile(result.profile);
-      setUser({
-        id: result.profile.id,
-        email: result.profile.email,
-        role: result.profile.role,
-        user_metadata: {
-          username: result.profile.username ?? undefined,
-          full_name: result.profile.full_name ?? undefined,
-          is_admin: result.profile.role === "admin",
-        },
-      });
+      setUser(profileToAuthUser(result.profile));
     }
   };
 
@@ -85,16 +87,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await registerServerFn({ data: { email, password, username, fullName } });
     if (result?.profile) {
       setProfile(result.profile);
-      setUser({
-        id: result.profile.id,
-        email: result.profile.email,
-        role: result.profile.role,
-        user_metadata: {
-          username: result.profile.username ?? undefined,
-          full_name: result.profile.full_name ?? undefined,
-          is_admin: result.profile.role === "admin",
-        },
-      });
+      setUser(profileToAuthUser(result.profile));
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    // Lazy-load Firebase to avoid crashing when env vars are not configured
+    const { getFirebaseAuth, GoogleAuthProvider, signInWithPopup } = await import("@/lib/firebase");
+    const auth = getFirebaseAuth();
+    const provider = new GoogleAuthProvider();
+    const credential = await signInWithPopup(auth, provider);
+    const googleUser = credential.user;
+
+    const result = await googleAuthServerFn({
+      data: {
+        uid: googleUser.uid,
+        email: googleUser.email!,
+        displayName: googleUser.displayName ?? undefined,
+        photoURL: googleUser.photoURL ?? undefined,
+      },
+    });
+
+    if (result?.profile) {
+      setProfile(result.profile);
+      setUser(profileToAuthUser(result.profile));
     }
   };
 
@@ -115,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       login,
       register,
+      loginWithGoogle,
       logout,
       refreshProfile: loadCurrentAuth,
     }),

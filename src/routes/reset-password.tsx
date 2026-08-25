@@ -5,10 +5,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Loader2, TrendingUp, ArrowRight } from "lucide-react";
+import { Lock, Loader2, TrendingUp, ArrowRight, AlertCircle } from "lucide-react";
 import { BrandingPane } from "./login";
+import { resetPasswordServerFn } from "@/lib/auth/auth.functions";
 
 export const Route = createFileRoute("/reset-password")({
+  validateSearch: (search: Record<string, unknown>): { token?: string } => ({
+    token: typeof search.token === "string" ? search.token : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Reset password — Intopsmm" },
@@ -22,19 +26,47 @@ export const Route = createFileRoute("/reset-password")({
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
+  const { token } = Route.useSearch();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // No token in URL — show error
+  if (!token) {
+    return (
+      <div className="grid min-h-screen lg:grid-cols-2">
+        <BrandingPane />
+        <div className="flex items-center justify-center bg-background px-6 py-12">
+          <div className="w-full max-w-md text-center space-y-4">
+            <span className="grid h-16 w-16 place-items-center rounded-full bg-destructive/10 mx-auto">
+              <AlertCircle className="h-8 w-8 text-destructive" />
+            </span>
+            <h1 className="text-2xl font-bold tracking-tight">Invalid reset link</h1>
+            <p className="text-sm text-muted-foreground">
+              This password reset link is missing or invalid. Please request a new one.
+            </p>
+            <Link to="/forgot-password">
+              <Button variant="hero" className="mt-4">
+                Request new link
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
     const parsed = z
       .string()
       .min(8, { message: "Password must be at least 8 characters" })
       .max(72)
       .safeParse(password);
+
     if (!parsed.success) {
       setError(parsed.error.issues[0].message);
       return;
@@ -43,11 +75,18 @@ function ResetPasswordPage() {
       setError("Passwords do not match.");
       return;
     }
+
     setSubmitting(true);
-    // Password reset confirmation
-    setSubmitting(false);
-    toast.success("Password updated successfully.");
-    navigate({ to: "/login", replace: true });
+    try {
+      await resetPasswordServerFn({ data: { token, password } });
+      toast.success("Password updated successfully. Please log in.");
+      navigate({ to: "/login", replace: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to reset password. Please try again.";
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -109,13 +148,7 @@ function ResetPasswordPage() {
               </p>
             )}
 
-            <Button
-              type="submit"
-              variant="hero"
-              size="lg"
-              className="w-full"
-              disabled={submitting}
-            >
+            <Button type="submit" variant="hero" size="lg" className="w-full" disabled={submitting}>
               {submitting ? (
                 <>
                   <Loader2 className="mr-1 h-4 w-4 animate-spin" /> Updating…

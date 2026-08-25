@@ -9,18 +9,19 @@ export const Route = createFileRoute("/_authenticated")({
       if (!res?.profile) {
         throw redirect({
           to: "/login",
-          search: {
-            redirect: location.href,
-          },
+          search: { redirect: location.href },
         });
       }
       return { user: res.user, profile: res.profile };
-    } catch {
+    } catch (err) {
+      // Re-throw TanStack redirect objects — they are intentional navigations
+      if (err instanceof Response || (err && typeof err === "object" && "to" in err)) {
+        throw err;
+      }
+      // Any real auth/network error → redirect to login
       throw redirect({
         to: "/login",
-        search: {
-          redirect: location.href,
-        },
+        search: { redirect: location.href },
       });
     }
   },

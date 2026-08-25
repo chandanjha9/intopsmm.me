@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
+import { isFirebaseConfigured } from "@/lib/firebase";
+
 function safePath(value: unknown): string {
   return typeof value === "string" && value.startsWith("/") && !value.startsWith("//")
     ? value
@@ -42,11 +44,12 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const { redirect } = Route.useSearch();
-  const { session, loading, login } = useAuth();
+  const { session, loading, login, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const destination = safePath(redirect);
 
@@ -67,7 +70,6 @@ function LoginPage() {
     }
 
     setSubmitting(true);
-
     try {
       await login(loginEmail, loginPassword);
       toast.success("Welcome back!");
@@ -77,6 +79,28 @@ function LoginPage() {
       setError(msg);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError(null);
+    if (!isFirebaseConfigured) {
+      toast.info("Google Sign-In is coming soon! Please sign in with email and password.");
+      return;
+    }
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+      toast.success("Signed in with Google!");
+      navigate({ to: destination, replace: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Google sign-in failed";
+      // User closed popup is not really an error
+      if (!msg.includes("popup-closed") && !msg.includes("cancelled")) {
+        setError(msg);
+      }
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -96,7 +120,36 @@ function LoginPage() {
             Log in to your dashboard and keep growing.
           </p>
 
-          <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+          {/* Google Sign-In */}
+          <Button
+            id="google-login-btn"
+            type="button"
+            variant="outline"
+            size="lg"
+            className="mt-6 w-full gap-2"
+            onClick={handleGoogleLogin}
+            disabled={googleLoading || submitting}
+          >
+            {googleLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <GoogleMark className="h-4 w-4" />
+            )}
+            Continue with Google
+            {!isFirebaseConfigured && (
+              <span className="ml-auto rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                Coming Soon
+              </span>
+            )}
+          </Button>
+
+          <div className="relative my-6 flex items-center gap-3">
+            <div className="flex-1 border-t border-border" />
+            <span className="text-xs text-muted-foreground">or sign in with email</span>
+            <div className="flex-1 border-t border-border" />
+          </div>
+
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
@@ -116,6 +169,12 @@ function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
               </div>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -141,7 +200,7 @@ function LoginPage() {
               </p>
             )}
 
-            <Button type="submit" variant="hero" size="lg" className="w-full" disabled={submitting}>
+            <Button id="email-login-btn" type="submit" variant="hero" size="lg" className="w-full" disabled={submitting || googleLoading}>
               {submitting ? (
                 <>
                   <Loader2 className="mr-1 h-4 w-4 animate-spin" /> Logging in…
@@ -202,7 +261,11 @@ export function BrandingPane() {
             creators and agencies in 170+ countries.
           </p>
           <div className="mt-8 grid gap-3">
-            {[{ icon: Zap, label: "Orders start in under 60 seconds" }, { icon: ShieldCheck, label: "PCI-compliant, secure by default" }, { icon: TrendingUp, label: "Refill guarantees on eligible services" }].map((f) => (
+            {[
+              { icon: Zap, label: "Orders start in under 60 seconds" },
+              { icon: ShieldCheck, label: "PCI-compliant, secure by default" },
+              { icon: TrendingUp, label: "Refill guarantees on eligible services" },
+            ].map((f) => (
               <div key={f.label} className="glass shadow-card flex items-center gap-3 rounded-2xl border border-border/60 p-3">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground">
                   <f.icon className="h-4 w-4" />

@@ -6,11 +6,11 @@ export default defineConfig({
   },
   nitro: {
     preset: "node-server",
-    externals: {
-      // msnodesqlv8 ships a prebuilt native C++ addon (.node file); it must
-      // never be bundled by Rolldown/Rollup — always require()d at runtime.
-      external: ["msnodesqlv8", "msnodesqlv8/lib/util", "mssql/msnodesqlv8.js"],
-    },
+    externals: [
+      "msnodesqlv8",
+      "msnodesqlv8/lib/util",
+      "mssql/msnodesqlv8.js",
+    ],
   },
   vite: {
     server: {
