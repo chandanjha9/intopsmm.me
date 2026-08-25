@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   Download,
   QrCode,
-  Sparkles,
   Copy,
   Check,
 } from "lucide-react";
@@ -181,34 +180,6 @@ function AddFundsPage() {
                   <Download className="mr-1.5 h-3.5 w-3.5 text-emerald-400" /> Download QR
                 </Button>
               </div>
-            </div>
-
-            {/* Payment Instructions */}
-            <div className="border-t border-border/40 pt-4">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-emerald-400" /> Payment Instructions
-              </h3>
-              <ul className="space-y-2 text-xs text-muted-foreground">
-                <li className="flex gap-2">
-                  <span className="font-bold text-emerald-400">1.</span>
-                  <span>Scan the UPI QR Code with any UPI app (GPay, PhonePe, Paytm, BHIM, etc).</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="font-bold text-emerald-400">2.</span>
-                  <span>Enter the amount you wish to add and complete the payment.</span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="font-bold text-emerald-400">3.</span>
-                  <span>
-                    Open your UPI app's transaction receipt and copy the{" "}
-                    <strong>12-digit UTR / UPI Transaction ID</strong>.
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <span className="font-bold text-emerald-400">4.</span>
-                  <span>Enter the exact amount paid and paste the UTR number below, then submit.</span>
-                </li>
-              </ul>
             </div>
 
             {/* Payment Form */}
