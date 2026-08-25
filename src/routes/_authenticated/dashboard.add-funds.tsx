@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuth } from "@/hooks/use-auth";
-import { createWalletTopup, submitUpiUtr, checkWalletTopup, listMyTopups } from "@/lib/payments.functions";
+import { submitStaticUpiPayment, fetchStaticQrCode, listMyTopups } from "@/lib/payments.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
@@ -35,10 +35,10 @@ export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
       {
         name: "description",
         content:
-          "Scan the 5-minute dynamic UPI QR code with your entered amount and top up your wallet instantly in INR.",
+          "Scan the UPI QR code, pay the amount, and enter the transaction UTR number to add funds to your wallet instantly.",
       },
       { property: "og:title", content: "Top Up Wallet — Intopsmm" },
-      { property: "og:description", content: "Enter an amount, scan the 5-min QR and pay with any UPI app." },
+      { property: "og:description", content: "Scan the QR code and submit UTR to top up your wallet." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
@@ -51,55 +51,51 @@ const QUICK_AMOUNTS = [15, 50, 100, 250, 500, 1000];
 const MIN_AMOUNT = 15;
 const MAX_AMOUNT = 200000;
 
-type ActiveQRSession = {
-  paymentOrderId: string;
-  orderRef: string;
-  amount: number;
-  qrDataUrl: string;
-  upiIntentUrl: string;
-  upiVpa: string;
-  upiName: string;
-  expiresAt: number;
-};
-
 function AddFundsPage() {
   const [amount, setAmount] = useState("15");
   const [agreed, setAgreed] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [activeSession, setActiveSession] = useState<ActiveQRSession | null>(null);
-  const [timeLeft, setTimeLeft] = useState<number>(0);
   const [utrNumber, setUtrNumber] = useState("");
-  const [isVerifyingUtr, setIsVerifyingUtr] = useState(false);
-  const [isUnderReview, setIsUnderReview] = useState(false);
-  const [isRejected, setIsRejected] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedVpa, setCopiedVpa] = useState(false);
 
   const { refreshProfile } = useAuth();
   const queryClient = useQueryClient();
+  
   const fetchTopups = useServerFn(listMyTopups);
-  const startTopup = useServerFn(createWalletTopup);
-  const verifyUtr = useServerFn(submitUpiUtr);
-  const checkTopup = useServerFn(checkWalletTopup);
-
-  const handleCopyVpa = () => {
-    if (!activeSession?.upiVpa) return;
-    void navigator.clipboard.writeText(activeSession.upiVpa);
-    setCopiedVpa(true);
-    toast.success("UPI ID copied! Open PhonePe/GPay/Paytm and send to this UPI ID.");
-    setTimeout(() => setCopiedVpa(false), 3000);
-  };
+  const submitStaticPayment = useServerFn(submitStaticUpiPayment);
+  const getQrCode = useServerFn(fetchStaticQrCode);
 
   const fmt = useMemo(() => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }), []);
   const amt = Math.max(0, Number(amount) || 0);
 
-  const topups = useQuery({ queryKey: ["my-topups"], queryFn: () => fetchTopups({}) });
+  // Load static QR code server-side details on mount
+  const qrQuery = useQuery({
+    queryKey: ["static-qr"],
+    queryFn: () => getQrCode({}),
+  });
 
-  // Refresh profile on mount to always display newest balance
+  // Query submissions history (Poll every 5 seconds for status changes)
+  const topups = useQuery({
+    queryKey: ["my-topups"],
+    queryFn: () => fetchTopups({}),
+    refetchInterval: 5000,
+  });
+
+  // Refresh user balance on mount
   useEffect(() => {
     void refreshProfile();
   }, [refreshProfile]);
+
+  // Balance changes will trigger a profile refresh immediately
+  const lastPaidCount = useMemo(() => {
+    return topups.data?.filter(t => t.status === "paid").length ?? 0;
+  }, [topups.data]);
+
+  useEffect(() => {
+    if (lastPaidCount > 0) {
+      void refreshProfile();
+    }
+  }, [lastPaidCount, refreshProfile]);
 
   const amountError =
     amount !== "" && (amt < MIN_AMOUNT || amt > MAX_AMOUNT)
@@ -107,118 +103,50 @@ function AddFundsPage() {
       : "";
 
   const amountReady = !amountError && amt >= MIN_AMOUNT;
-  const canGenerate = amountReady && agreed && !isGenerating;
+  const canSubmit = amountReady && agreed && utrNumber.trim().length >= 10 && !isSubmitting;
 
-  // Handle countdown timer for active QR
-  useEffect(() => {
-    if (!activeSession || paymentSuccess) return;
-
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.floor((activeSession.expiresAt - Date.now()) / 1000));
-      setTimeLeft(remaining);
-
-      if (remaining <= 0) {
-        clearInterval(interval);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [activeSession, paymentSuccess]);
-
-  // Real-time polling when under review or active
-  useEffect(() => {
-    if (!activeSession || paymentSuccess) return;
-
-    const pollTimer = setInterval(async () => {
-      try {
-        const res = await checkTopup({ data: { paymentOrderId: activeSession.paymentOrderId } });
-        if (res.status === "paid") {
-          setPaymentSuccess(true);
-          setIsUnderReview(false);
-          setIsRejected(false);
-          await refreshProfile();
-          await queryClient.invalidateQueries();
-          toast.success(`🎉 Payment of ₹${fmt.format(activeSession.amount)} Approved & Added to Wallet!`);
-          clearInterval(pollTimer);
-        } else if (res.status === "failed" || res.status === "rejected") {
-          setIsUnderReview(false);
-          setIsRejected(true);
-          setRejectionReason(res.error || "Payment was rejected (Invalid UTR / Transaction Not Found).");
-          toast.error("❌ Payment rejected: Invalid or unverified UTR number.");
-          clearInterval(pollTimer);
-        }
-      } catch {
-        // Keep polling
-      }
-    }, 2500);
-
-    return () => clearInterval(pollTimer);
-  }, [activeSession, paymentSuccess, checkTopup, queryClient, refreshProfile, fmt]);
-
-  // Generate dynamic QR code
-  const handleGenerateQR = async () => {
-    if (!canGenerate) return;
-    setIsGenerating(true);
-    setPaymentSuccess(false);
-    setIsUnderReview(false);
-    setIsRejected(false);
-    setRejectionReason("");
-    setUtrNumber("");
-
-    try {
-      const session = await startTopup({ data: { amount: amt } });
-      setActiveSession(session);
-      setTimeLeft(Math.max(0, Math.floor((session.expiresAt - Date.now()) / 1000)));
-      toast.success(`Dynamic UPI QR generated for ₹${fmt.format(amt)}. Scan & Pay.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to generate QR code");
-    } finally {
-      setIsGenerating(false);
-    }
+  const handleCopyVpa = () => {
+    const vpa = qrQuery.data?.upiVpa;
+    if (!vpa) return;
+    void navigator.clipboard.writeText(vpa);
+    setCopiedVpa(true);
+    toast.success("UPI ID copied! Open PhonePe/GPay/Paytm and send to this UPI ID.");
+    setTimeout(() => setCopiedVpa(false), 3000);
   };
 
-  // Submit UTR
-  const handleVerifyUtr = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!activeSession || !utrNumber.trim()) {
-      toast.error("Please enter the 12-digit UPI UTR / Transaction ID from your payment app");
-      return;
-    }
-
-    setIsVerifyingUtr(true);
-    setIsRejected(false);
-    try {
-      await verifyUtr({
-        data: {
-          paymentOrderId: activeSession.paymentOrderId,
-          utrNumber: utrNumber.trim(),
-        },
-      });
-
-      setIsUnderReview(true);
-      toast.info("⏳ UTR Submitted! Verification in progress...");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to submit UTR. Please check and try again.");
-    } finally {
-      setIsVerifyingUtr(false);
-    }
-  };
-
-  // Download QR code image
   const handleDownloadQR = () => {
-    if (!activeSession?.qrDataUrl) return;
+    const url = qrQuery.data?.qrDataUrl;
+    if (!url) return;
     const link = document.createElement("a");
-    link.href = activeSession.qrDataUrl;
-    link.download = `Intopsmm-QR-₹${activeSession.amount}.png`;
+    link.href = url;
+    link.download = `Intopsmm-QR.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.info("QR Code downloaded! Open PhonePe/GPay/Paytm to scan from gallery.");
+    toast.info("QR Code downloaded!");
   };
 
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  const timeFormatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setIsSubmitting(true);
+
+    try {
+      await submitStaticPayment({
+        data: {
+          amount: amt,
+          utrNumber: utrNumber.trim(),
+        },
+      });
+      toast.success("⏳ Transaction submitted successfully! Admin will verify and credit your wallet shortly.");
+      setUtrNumber("");
+      await queryClient.invalidateQueries({ queryKey: ["my-topups"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit transaction.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <DashboardShell active="Add Funds">
@@ -227,14 +155,13 @@ function AddFundsPage() {
         <div className="grid gap-4 p-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="min-w-0">
             <span className="inline-flex rounded-full bg-emerald-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-400">
-              5-Minute Dynamic UPI QR
+              UPI QR Code & UTR Verification
             </span>
             <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-              TOP UP <span className="gradient-text">WALLET</span>
+              ADD <span className="gradient-text">FUNDS</span>
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Enter the amount, generate a 5-minute dynamic UPI QR code, scan with any UPI app, and get credited
-              instantly.
+              Scan the UPI QR code below, pay the amount, and submit the 12-digit UPI UTR number to get wallet credit.
             </p>
           </div>
           <span className="hidden h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-lg sm:grid">
@@ -244,14 +171,101 @@ function AddFundsPage() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-12">
-        {/* Left Column: Top-Up Controls & Dynamic QR */}
+        {/* Left Column: QR Code & Form */}
         <div className="space-y-6 lg:col-span-7">
-          <Card className="glass border-border/60 p-6 shadow-card">
-            <div className="space-y-5">
+          <Card className="glass border-border/60 p-6 shadow-card space-y-6">
+            <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-emerald-400" /> Pay using UPI QR Code
+            </h2>
+
+            {/* Static QR Code Image Display */}
+            <div className="flex flex-col items-center justify-center space-y-4">
+              {qrQuery.isLoading ? (
+                <div className="flex h-[240px] w-[240px] items-center justify-center rounded-2xl border-2 border-dashed border-emerald-500/30">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
+                </div>
+              ) : qrQuery.data?.qrDataUrl ? (
+                <div className="mx-auto flex aspect-square w-full max-w-[240px] items-center justify-center rounded-2xl border-2 border-emerald-500/40 bg-white p-3 shadow-2xl">
+                  <img
+                    src={qrQuery.data.qrDataUrl}
+                    alt="Intopsmm Static UPI QR"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-destructive">Failed to load QR code image.</p>
+              )}
+
+              {/* Copy UPI ID Box */}
+              {!qrQuery.isLoading && qrQuery.data && (
+                <div className="w-full max-w-md flex items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
+                  <div className="min-w-0 text-left">
+                    <p className="text-[10px] font-bold text-emerald-400">UPI ID / VPA</p>
+                    <p className="truncate font-mono text-sm font-bold text-foreground">{qrQuery.data.upiVpa}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleCopyVpa}
+                    className="h-9 shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition shadow-sm"
+                  >
+                    {copiedVpa ? (
+                      <>
+                        <Check className="mr-1 h-3.5 w-3.5" /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="mr-1 h-3.5 w-3.5" /> Copy ID
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {!qrQuery.isLoading && qrQuery.data && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadQR}
+                  className="rounded-lg border-border/85"
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5 text-emerald-400" /> Download QR Code
+                </Button>
+              )}
+            </div>
+
+            {/* Instruction list right below QR */}
+            <div className="border-t border-border/40 pt-4">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-emerald-400" /> Payment Instructions
+              </h3>
+              <ul className="space-y-2 text-xs text-muted-foreground">
+                <li className="flex gap-2">
+                  <span className="font-bold text-emerald-400">1.</span>
+                  <span>Scan the UPI QR Code with any UPI app (GPay, PhonePe, Paytm, BHIM, etc).</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-bold text-emerald-400">2.</span>
+                  <span>Enter the amount you wish to add and complete the transaction.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-bold text-emerald-400">3.</span>
+                  <span>Go to the transaction history/receipt of your payment app and copy the <strong>12-digit UPI Transaction ID / UTR Number</strong>.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="font-bold text-emerald-400">4.</span>
+                  <span>Enter the exact Amount paid and the copied UTR Number below to submit verification.</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Payment Input Form */}
+            <form onSubmit={handleSubmit} className="border-t border-border/40 pt-5 space-y-4">
               {/* Amount Selection */}
               <div className="space-y-2">
                 <Label htmlFor="amount" className="text-sm font-semibold">
-                  Amount to Add (₹{MIN_AMOUNT} – ₹{fmt.format(MAX_AMOUNT)})
+                  Amount Paid (₹{MIN_AMOUNT} – ₹{fmt.format(MAX_AMOUNT)})
                 </Label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground">
@@ -263,7 +277,7 @@ function AddFundsPage() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
                     placeholder="Enter amount"
-                    className="h-14 rounded-xl border-border/60 bg-background/80 pl-9 text-xl font-bold tracking-wide"
+                    className="h-12 rounded-xl border-border/60 bg-background pl-9 text-lg font-bold tracking-wide"
                   />
                 </div>
                 {amountError && <p className="text-xs font-medium text-destructive">{amountError}</p>}
@@ -276,7 +290,7 @@ function AddFundsPage() {
                     key={val}
                     type="button"
                     onClick={() => setAmount(String(val))}
-                    className={`rounded-xl border px-4 py-2 text-sm font-bold transition-all ${
+                    className={`rounded-xl border px-4 py-2 text-xs font-bold transition-all ${
                       amt === val
                         ? "border-emerald-500 bg-emerald-500/15 text-emerald-400 shadow-sm"
                         : "border-border/60 bg-secondary/40 text-muted-foreground hover:border-emerald-500/50 hover:text-foreground"
@@ -287,6 +301,21 @@ function AddFundsPage() {
                 ))}
               </div>
 
+              {/* UTR Input Field */}
+              <div className="space-y-2">
+                <Label htmlFor="utr" className="text-sm font-semibold">
+                  12-Digit UPI UTR / Ref Number
+                </Label>
+                <Input
+                  id="utr"
+                  value={utrNumber}
+                  onChange={(e) => setUtrNumber(e.target.value.replace(/[^0-9A-Za-z]/g, ""))}
+                  placeholder="e.g. 423589123456"
+                  maxLength={22}
+                  className="h-12 rounded-xl border-border/60 bg-background text-base font-mono tracking-wider font-bold"
+                />
+              </div>
+
               {/* Agreement */}
               <label className="flex cursor-pointer items-start gap-2.5 text-xs text-muted-foreground">
                 <Checkbox checked={agreed} onCheckedChange={(v) => setAgreed(v === true)} className="mt-0.5" />
@@ -295,265 +324,43 @@ function AddFundsPage() {
                 </span>
               </label>
 
-              {/* Generate QR Button */}
+              {/* Submit UTR Verification Button */}
               <Button
+                type="submit"
                 variant="hero"
-                className="h-14 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-base font-bold shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-teal-700"
-                disabled={!canGenerate}
-                onClick={handleGenerateQR}
+                className="h-12 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-sm font-bold shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-teal-700"
+                disabled={!canSubmit}
               >
-                {isGenerating ? (
+                {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Generating 5-Min Dynamic QR…
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying Submission…
                   </>
                 ) : (
                   <>
-                    <QrCode className="mr-2 h-5 w-5" />
-                    Generate Dynamic QR Code ({amountReady ? `₹${fmt.format(amt)}` : ""})
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Submit UTR for Wallet Credit
                   </>
                 )}
               </Button>
-
-              {/* Active Dynamic QR Display Card */}
-              {activeSession && (
-                <div className="overflow-hidden rounded-2xl border border-emerald-500/30 bg-emerald-950/10 p-5 shadow-inner">
-                  {paymentSuccess ? (
-                    /* Success State */
-                    <div className="py-8 text-center">
-                      <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
-                        <CheckCircle2 className="h-10 w-10 animate-bounce" />
-                      </div>
-                      <h3 className="text-xl font-bold text-emerald-400">Payment Approved & Added! 🎉</h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        ₹{fmt.format(activeSession.amount)} has been credited to your wallet balance.
-                      </p>
-                      <Button
-                        onClick={() => {
-                          setActiveSession(null);
-                          setPaymentSuccess(false);
-                          setIsUnderReview(false);
-                          setIsRejected(false);
-                          setUtrNumber("");
-                        }}
-                        className="mt-4 rounded-xl bg-emerald-500 font-semibold text-white hover:bg-emerald-600"
-                      >
-                        Add More Funds
-                      </Button>
-                    </div>
-                  ) : isRejected ? (
-                    /* Rejection State */
-                    <div className="py-6 text-center space-y-3">
-                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/20 text-destructive">
-                        <AlertCircle className="h-9 w-9" />
-                      </div>
-                      <h3 className="text-xl font-bold text-destructive">Payment Rejected</h3>
-                      <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                        {rejectionReason || "The UTR number you entered could not be verified in our bank statement."}
-                      </p>
-                      <div className="pt-2 flex justify-center gap-3">
-                        <Button
-                          onClick={() => {
-                            setIsRejected(false);
-                            setIsUnderReview(false);
-                            setUtrNumber("");
-                          }}
-                          className="rounded-xl bg-primary text-primary-foreground font-bold"
-                        >
-                          Try Again with Correct UTR
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={handleGenerateQR}
-                          className="rounded-xl border-border/80"
-                        >
-                          Generate New QR
-                        </Button>
-                      </div>
-                    </div>
-                  ) : timeLeft <= 0 ? (
-                    /* Expired State */
-                    <div className="py-6 text-center">
-                      <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/20 text-destructive">
-                        <XCircle className="h-8 w-8" />
-                      </div>
-                      <h3 className="text-lg font-bold text-destructive">QR Code Expired</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        This 5-minute QR code has expired for security. Please generate a new one.
-                      </p>
-                      <Button
-                        onClick={handleGenerateQR}
-                        className="mt-3 rounded-xl bg-primary text-primary-foreground"
-                      >
-                        <RefreshCw className="mr-1.5 h-4 w-4" /> Generate New QR
-                      </Button>
-                    </div>
-                  ) : (
-                    /* Active 5-Minute QR State */
-                    <div className="text-center space-y-4">
-                      {/* Timer Badge */}
-                      <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1.5 text-sm font-bold text-emerald-400">
-                        <Clock className="h-4 w-4 animate-spin text-emerald-400" />
-                        Expires in: <span className="font-mono text-base">{timeFormatted}</span>
-                      </div>
-
-                      {/* QR Image Box */}
-                      <div className="mx-auto my-2 flex aspect-square w-full max-w-[240px] items-center justify-center rounded-2xl border-2 border-emerald-500/40 bg-white p-3 shadow-2xl">
-                        <img
-                          src={activeSession.qrDataUrl}
-                          alt={`UPI QR for ₹${activeSession.amount}`}
-                          className="h-full w-full object-contain"
-                        />
-                      </div>
-
-                      {/* Amount Details */}
-                      <div className="space-y-2">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Pay Exact Amount
-                        </p>
-                        <p className="text-3xl font-black text-foreground">₹{fmt.format(activeSession.amount)}</p>
-
-                        {/* 1-Click Copy UPI ID Box (Method 1 - Most Reliable) */}
-                        <div className="mx-auto flex max-w-md items-center justify-between gap-2 rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-3">
-                          <div className="min-w-0 text-left">
-                            <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                              Method 1: Copy UPI ID (Recommended)
-                            </p>
-                            <p className="truncate font-mono text-sm font-bold text-foreground">{activeSession.upiVpa}</p>
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={handleCopyVpa}
-                            className={`h-9 shrink-0 rounded-lg text-xs font-bold transition shadow-sm ${
-                              copiedVpa
-                                ? "bg-emerald-600 text-white"
-                                : "bg-emerald-600 text-white hover:bg-emerald-700"
-                            }`}
-                          >
-                            {copiedVpa ? (
-                              <>
-                                <Check className="mr-1 h-3.5 w-3.5" /> Copied!
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="mr-1 h-3.5 w-3.5" /> Copy UPI ID
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="mx-auto max-w-md">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleDownloadQR}
-                          className="h-12 w-full rounded-xl border-emerald-500/30 bg-background text-sm font-bold shadow-sm hover:bg-secondary"
-                        >
-                          <Download className="mr-2 h-4 w-4 text-emerald-500" /> Download QR Code Image
-                        </Button>
-                      </div>
-
-
-
-                      {/* UTR Verification Section */}
-                      <form onSubmit={handleVerifyUtr} className="pt-3 border-t border-border/40 space-y-3">
-                        <div className="text-left space-y-1">
-                          <Label htmlFor="utr" className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                            <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
-                            Enter 12-Digit UPI Ref / UTR No. After Payment:
-                          </Label>
-                          <Input
-                            id="utr"
-                            value={utrNumber}
-                            onChange={(e) => setUtrNumber(e.target.value.replace(/[^0-9A-Za-z]/g, ""))}
-                            placeholder="e.g. 423589123456"
-                            maxLength={22}
-                            disabled={isUnderReview}
-                            className="h-11 rounded-xl border-emerald-500/40 bg-background/90 text-sm font-mono tracking-wider font-bold"
-                          />
-                        </div>
-
-                        {isUnderReview ? (
-                          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-center space-y-1.5">
-                            <div className="flex items-center justify-center gap-2 text-xs font-bold text-amber-400">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Payment Verification in Progress…
-                            </div>
-                            <p className="text-[11px] text-muted-foreground">
-                              Payment verification in progress. Your wallet will update automatically once confirmed.
-                            </p>
-                          </div>
-                        ) : (
-                          <Button
-                            type="submit"
-                            disabled={!utrNumber.trim() || isVerifyingUtr}
-                            className="h-12 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 font-bold text-sm text-white shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-teal-700"
-                          >
-                            {isVerifyingUtr ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting UTR…
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle2 className="mr-2 h-4 w-4" /> Submit UTR for Instant Credit
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </form>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            </form>
           </Card>
         </div>
 
         {/* Right Column: Passbook & Payment Guide */}
         <div className="space-y-6 lg:col-span-5">
-          {/* Instructions */}
-          <Card className="glass border-border/60 p-5 shadow-card">
+          {/* Security details */}
+          <Card className="glass border-border/60 p-5 shadow-card space-y-3">
             <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              <Sparkles className="h-4 w-4 text-emerald-400" /> How Dynamic UPI QR Works
+              <ShieldCheck className="h-4 w-4 text-emerald-400" /> Gateway Security
             </h3>
-            <ol className="mt-3 space-y-2.5 text-xs text-muted-foreground">
-              <li className="flex gap-2">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
-                  1
-                </span>
-                <span>Enter amount and click <strong>Generate Dynamic QR</strong>.</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
-                  2
-                </span>
-                <span>Scan the QR code with <strong>PhonePe, Google Pay, Paytm, or BHIM</strong>.</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
-                  3
-                </span>
-                <span>Complete the payment within <strong>5 minutes</strong>.</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400">
-                  4
-                </span>
-                <span>Enter the <strong>12-digit UTR / UPI Ref ID</strong> and submit for instant verification.</span>
-              </li>
-            </ol>
-            <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-500/10 p-3 text-[11px] font-medium text-emerald-400">
-              <ShieldCheck className="h-4 w-4 shrink-0" />
-              Direct 256-bit encrypted UPI instant payment gateway.
-            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Every transaction submitted is cross-verified automatically with our bank node using the 12-digit transaction ID. Wallet balances are credited immediately upon automated verification. Fake submissions will lock the user account.
+            </p>
           </Card>
 
-          {/* Top-up History Passbook (Only Successful Payments) */}
+          {/* Submissions/Add Funds Transaction History */}
           <Card className="glass border-border/60 p-5 shadow-card">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Successful Top-Ups</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Transaction History</h2>
               <button
                 onClick={() => queryClient.invalidateQueries({ queryKey: ["my-topups"] })}
                 className="text-xs font-medium text-muted-foreground hover:text-foreground"
@@ -561,39 +368,70 @@ function AddFundsPage() {
                 <RefreshCw className="h-3.5 w-3.5" />
               </button>
             </div>
-            <div className="mt-4 space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+            <div className="mt-4 space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
               {topups.isLoading && <p className="text-xs text-muted-foreground">Loading passbook…</p>}
+              
               {!topups.isLoading && (topups.data?.length ?? 0) === 0 && (
-                <p className="py-6 text-center text-xs text-muted-foreground">No completed top-ups yet.</p>
+                <p className="py-6 text-center text-xs text-muted-foreground">No recent transactions.</p>
               )}
-              {topups.data?.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between rounded-xl border border-border/60 bg-secondary/30 p-3.5"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-bold">
-                      {p.gateway_payment_id || p.id.slice(0, 8)}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {new Date(p.created_at).toLocaleString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-lg bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-400">
-                      ₹{fmt.format(Number(p.amount))}
-                    </span>
+              
+              {topups.data?.map((p) => {
+                let statusBadge = null;
+                if (p.status === "paid") {
+                  statusBadge = (
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Paid
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Successfully Added Amount
                     </span>
+                  );
+                } else if (p.status === "under_review") {
+                  statusBadge = (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400">
+                      <Clock className="h-3.5 w-3.5 text-amber-400 animate-pulse" /> Verification Pending
+                    </span>
+                  );
+                } else {
+                  // failed, rejected, canceled
+                  statusBadge = (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-destructive">
+                      <XCircle className="h-3.5 w-3.5" /> Transaction Failed
+                    </span>
+                  );
+                }
+
+                return (
+                  <div
+                    key={p.id}
+                    className="flex flex-col gap-2 rounded-xl border border-border/60 bg-secondary/30 p-3.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold font-mono">UTR: {p.gateway_payment_id || "N/A"}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {new Date(p.created_at).toLocaleString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      <span className="rounded-lg bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-400">
+                        ₹{fmt.format(Number(p.amount))}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs mt-1 border-t border-border/20 pt-1.5">
+                      <div className="flex items-center justify-between">
+                        {statusBadge}
+                      </div>
+                      {p.error_message && (
+                        <p className="text-[10px] text-destructive font-medium italic mt-0.5">
+                          Reason: {p.error_message}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
         </div>

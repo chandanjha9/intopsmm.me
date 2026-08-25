@@ -274,38 +274,50 @@ export async function syncOrderStatuses(): Promise<{ checked: number; updated: n
           continue;
         }
 
-        await db
-          .request()
-          .input("id", sql.UniqueIdentifier, entry.orderId)
-          .input("status", sql.NVarChar, parsed.status)
-          .input("startCount", sql.Int, parsed.startCount)
-          .input("remains", sql.Int, parsed.remains)
-          .input("lastSyncedAt", sql.DateTimeOffset, new Date().toISOString())
-          .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
-          .query(`
-            UPDATE orders 
-            SET status = @status, start_count = @startCount, remains = @remains, 
-                last_synced_at = @lastSyncedAt, updated_at = @updatedAt 
-            WHERE id = @id
-          `);
-
-        await db
-          .request()
-          .input("orderId", sql.UniqueIdentifier, entry.orderId)
-          .input("fromStatus", sql.NVarChar, entry.currentStatus)
-          .input("toStatus", sql.NVarChar, parsed.status)
-          .input("note", sql.NVarChar, "Provider status sync")
-          .query(`
-            INSERT INTO order_status_history (order_id, from_status, to_status, note)
-            VALUES (@orderId, @fromStatus, @toStatus, @note)
-          `);
-
-        if (parsed.status === "canceled") {
+        if (parsed.status === "canceled" || parsed.status === "refunded") {
           await db
             .request()
             .input("orderId", sql.UniqueIdentifier, entry.orderId)
-            .input("reason", sql.NVarChar, "Order canceled by provider")
+            .input("reason", sql.NVarChar, `Order ${parsed.status} by provider`)
             .execute("sp_refund_order");
+
+          await db
+            .request()
+            .input("id", sql.UniqueIdentifier, entry.orderId)
+            .input("startCount", sql.Int, parsed.startCount)
+            .input("remains", sql.Int, parsed.remains)
+            .input("lastSyncedAt", sql.DateTimeOffset, new Date().toISOString())
+            .query(`
+              UPDATE orders 
+              SET start_count = @startCount, remains = @remains, last_synced_at = @lastSyncedAt 
+              WHERE id = @id
+            `);
+        } else {
+          await db
+            .request()
+            .input("id", sql.UniqueIdentifier, entry.orderId)
+            .input("status", sql.NVarChar, parsed.status)
+            .input("startCount", sql.Int, parsed.startCount)
+            .input("remains", sql.Int, parsed.remains)
+            .input("lastSyncedAt", sql.DateTimeOffset, new Date().toISOString())
+            .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
+            .query(`
+              UPDATE orders 
+              SET status = @status, start_count = @startCount, remains = @remains, 
+                  last_synced_at = @lastSyncedAt, updated_at = @updatedAt 
+              WHERE id = @id
+            `);
+
+          await db
+            .request()
+            .input("orderId", sql.UniqueIdentifier, entry.orderId)
+            .input("fromStatus", sql.NVarChar, entry.currentStatus)
+            .input("toStatus", sql.NVarChar, parsed.status)
+            .input("note", sql.NVarChar, "Provider status sync")
+            .query(`
+              INSERT INTO order_status_history (order_id, from_status, to_status, note)
+              VALUES (@orderId, @fromStatus, @toStatus, @note)
+            `);
         }
 
         updated += 1;

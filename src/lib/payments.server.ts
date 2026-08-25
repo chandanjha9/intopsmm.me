@@ -160,6 +160,111 @@ export async function getTopupStatus(userId: string, paymentOrderId: string) {
   return { status: data.status, amount: Number(data.amount), error: data.error_message };
 }
 
+/**
+ * Submits UTR and amount for verification against static QR code payments.
+ */
+export async function submitStaticUtrVerification(
+  userId: string,
+  params: {
+    amount: number;
+    utrNumber: string;
+  }
+) {
+  const amount = Number(params.amount);
+  if (isNaN(amount) || amount < 15) {
+    throw new Error("Minimum top-up amount is ₹15.");
+  }
+  if (amount > 200000) {
+    throw new Error("Maximum top-up amount is ₹2,00,000.");
+  }
+
+  const cleanUtr = params.utrNumber.trim().toUpperCase();
+  if (!/^[A-Z0-9]{10,22}$/.test(cleanUtr)) {
+    throw new Error("Please enter a valid 10 to 22-digit UPI UTR / Transaction Ref ID.");
+  }
+
+  const db = await poolConnect;
+
+  // Check if UTR was already submitted on another order (paid or under_review)
+  const checkDuplicate = await db
+    .request()
+    .input("utr", sql.NVarChar, cleanUtr)
+    .query("SELECT id, status FROM payment_orders WHERE gateway_payment_id = @utr AND status IN ('paid', 'under_review')");
+
+  if (checkDuplicate.recordset.length > 0) {
+    const existing = checkDuplicate.recordset[0];
+    if (existing.status === "paid") {
+      throw new Error("This UTR / Transaction ID has already been credited to a wallet.");
+    } else {
+      throw new Error("This UTR / Transaction ID has already been submitted and is currently pending verification.");
+    }
+  }
+
+  const orderRef = `GMSMM${Date.now().toString().slice(-8)}`;
+
+  // Insert payment order directly as 'under_review'
+  const result = await db
+    .request()
+    .input("userId", sql.UniqueIdentifier, userId)
+    .input("gateway", sql.NVarChar, "upi_qr")
+    .input("gatewayOrderId", sql.NVarChar, orderRef)
+    .input("gatewayPaymentId", sql.NVarChar, cleanUtr)
+    .input("amount", sql.Decimal(18, 4), amount)
+    .input("currency", sql.NVarChar, "INR")
+    .input("status", sql.NVarChar, "under_review")
+    .query(`
+      INSERT INTO payment_orders (user_id, gateway, gateway_order_id, gateway_payment_id, amount, currency, status)
+      OUTPUT INSERTED.id
+      VALUES (@userId, @gateway, @gatewayOrderId, @gatewayPaymentId, @amount, @currency, @status)
+    `);
+
+  const paymentOrderId = result.recordset[0]?.id;
+
+  // Fetch user email
+  const userRes = await db
+    .request()
+    .input("userId", sql.UniqueIdentifier, userId)
+    .query("SELECT email FROM users WHERE id = @userId");
+
+  const userEmail = userRes.recordset[0]?.email || "User";
+
+  // Send instant push notification to Admin Telegram
+  sendTelegramPaymentAlert({
+    paymentOrderId,
+    orderRef,
+    userEmail,
+    amount,
+    utrNumber: cleanUtr,
+  }).catch((err) => console.error("[telegram] Alert error:", err));
+
+  return { paymentOrderId, status: "under_review" as const, amount };
+}
+
+/**
+ * Generates static QR info for the client based on server configuration.
+ */
+export async function getStaticQrInfo() {
+  const upiVpa = process.env.UPI_VPA || "chandankrjha45@pingpay";
+  const upiName = process.env.UPI_NAME || "Intopsmm";
+  const upiIntentUrl = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(upiName)}`;
+
+  const qrDataUrl = await QRCode.toDataURL(upiIntentUrl, {
+    errorCorrectionLevel: "H",
+    margin: 2,
+    width: 400,
+    color: {
+      dark: "#000000",
+      light: "#FFFFFF",
+    },
+  });
+
+  return {
+    upiVpa,
+    upiName,
+    qrDataUrl,
+  };
+}
+
 /** Webhook handler stub */
 export async function handleRazorpayWebhook(_rawBody: string, _signature: string | null) {
   return new Response("ok");

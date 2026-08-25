@@ -11,7 +11,7 @@ export default defineConfig({
       "msnodesqlv8/lib/util",
       "mssql/msnodesqlv8.js",
     ],
-  },
+  } as any,
   vite: {
     server: {
       port: 5173,

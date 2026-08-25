@@ -8,6 +8,7 @@ import {
   requestOrderCancel,
   requestOrderRefill,
 } from "./orders.server";
+import { syncOrderStatuses } from "./providers/sync.server";
 
 const createOrderSchema = z.object({
   serviceId: z.string().uuid(),
@@ -49,6 +50,9 @@ export const listServices = createServerFn({ method: "GET" })
 export const listMyOrders = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async ({ context }) => {
+    // Trigger a live sync before querying so start_count, remains, and status
+    // are always up-to-date when the user views order history or the refill page.
+    try { await syncOrderStatuses(); } catch { /* non-fatal */ }
     const db = await poolConnect;
     const result = await db
       .request()
@@ -101,6 +105,7 @@ export const listMyOrders = createServerFn({ method: "GET" })
 export const listMyRefills = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async ({ context }) => {
+    try { await syncOrderStatuses(); } catch { /* non-fatal */ }
     const db = await poolConnect;
     const result = await db
       .request()
