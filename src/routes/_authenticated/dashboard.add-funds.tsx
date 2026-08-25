@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,14 +11,13 @@ import {
   Wallet,
   Loader2,
   CheckCircle2,
-  Download,
   QrCode,
-  Copy,
+  Sparkles,
   Check,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuth } from "@/hooks/use-auth";
-import { submitStaticUpiPayment } from "@/lib/payments.functions";
+import { submitStaticUpiPayment, fetchStaticQrCode } from "@/lib/payments.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
@@ -43,20 +42,24 @@ export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
 const QUICK_AMOUNTS = [15, 50, 100, 250, 500, 1000];
 const MIN_AMOUNT = 15;
 const MAX_AMOUNT = 200000;
-const STATIC_UPI_VPA = "chandankrjha45@pingpay";
-const STATIC_UPI_NAME = "CHANDAN KUMAR JHA";
 
 function AddFundsPage() {
   const [amount, setAmount] = useState("15");
   const [agreed, setAgreed] = useState(true);
   const [utrNumber, setUtrNumber] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [copiedVpa, setCopiedVpa] = useState(false);
 
   const { refreshProfile } = useAuth();
   const queryClient = useQueryClient();
 
   const submitStaticPayment = useServerFn(submitStaticUpiPayment);
+  const getQrCode = useServerFn(fetchStaticQrCode);
+
+  // Load static QR code server-side details on mount
+  const qrQuery = useQuery({
+    queryKey: ["static-qr"],
+    queryFn: () => getQrCode({}),
+  });
 
   const fmt = useMemo(() => new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }), []);
   const amt = Math.max(0, Number(amount) || 0);
@@ -73,23 +76,6 @@ function AddFundsPage() {
 
   const amountReady = !amountError && amt >= MIN_AMOUNT;
   const canSubmit = amountReady && agreed && utrNumber.trim().length >= 10 && !isSubmitting;
-
-  const handleCopyVpa = () => {
-    void navigator.clipboard.writeText(STATIC_UPI_VPA);
-    setCopiedVpa(true);
-    toast.success("UPI ID copied! Open PhonePe/GPay/Paytm and send to this UPI ID.");
-    setTimeout(() => setCopiedVpa(false), 3000);
-  };
-
-  const handleDownloadQR = () => {
-    const link = document.createElement("a");
-    link.href = "/upi-qr.png";
-    link.download = "Intopsmm-UPI-QR.png";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.info("QR Code downloaded!");
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,40 +132,19 @@ function AddFundsPage() {
 
             {/* Static QR Code Image — no border/circle, just the image */}
             <div className="flex flex-col items-center justify-center space-y-4">
-              <img
-                src="/upi-qr.png"
-                alt="Intopsmm UPI QR — CHANDAN KUMAR JHA"
-                className="mx-auto w-full max-w-[280px] object-contain rounded-xl shadow-lg"
-              />
-
-              {/* UPI Name + ID */}
-              <div className="text-center space-y-0.5">
-                <p className="text-sm font-black tracking-wide text-foreground">{STATIC_UPI_NAME}</p>
-                <p className="text-xs text-muted-foreground font-mono">UPI ID: {STATIC_UPI_VPA}</p>
-              </div>
-
-              {/* Copy UPI ID + Download Row */}
-              <div className="flex flex-wrap items-center justify-center gap-2 w-full max-w-xs">
-                <Button
-                  type="button"
-                  onClick={handleCopyVpa}
-                  className="flex-1 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white shadow-sm"
-                >
-                  {copiedVpa ? (
-                    <><Check className="mr-1.5 h-3.5 w-3.5" /> Copied!</>
-                  ) : (
-                    <><Copy className="mr-1.5 h-3.5 w-3.5" /> Copy UPI ID</>
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleDownloadQR}
-                  className="flex-1 h-9 rounded-xl border-border/70 text-xs font-bold"
-                >
-                  <Download className="mr-1.5 h-3.5 w-3.5 text-emerald-400" /> Download QR
-                </Button>
-              </div>
+              {qrQuery.isLoading ? (
+                <div className="flex h-[240px] w-[240px] items-center justify-center rounded-2xl border-2 border-dashed border-emerald-500/30">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
+                </div>
+              ) : qrQuery.data?.qrDataUrl ? (
+                <img
+                  src={qrQuery.data.qrDataUrl}
+                  alt="Intopsmm Static UPI QR"
+                  className="mx-auto w-full max-w-[280px] object-contain rounded-xl shadow-lg"
+                />
+              ) : (
+                <p className="text-xs text-destructive">Failed to load QR code image.</p>
+              )}
             </div>
 
             {/* Payment Form */}
