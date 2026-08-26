@@ -29,6 +29,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import { isCurrentUserAdmin } from "@/lib/providers/admin.functions";
+import { Logo } from "@/components/ui/Logo";
 
 const navItems = [
   { icon: Plus, label: "New Order", to: "/dashboard" as const, emoji: "🛒" },

@@ -1,6 +1,5 @@
-import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { getMeServerFn } from "@/lib/auth/auth.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -45,17 +44,6 @@ import {
 
 export const Route = createFileRoute("/")({
   ssr: false,
-  beforeLoad: async () => {
-    try {
-      const res = await getMeServerFn();
-      if (res?.profile) {
-        throw redirect({ to: "/dashboard", replace: true });
-      }
-    } catch (err) {
-      // Re-throw intentional redirects, ignore auth errors (user not logged in)
-      if (err && typeof err === "object" && "to" in err) throw err;
-    }
-  },
   head: () => ({
     meta: [
       { title: "Intopsmm — Cheapest & Fastest SMM Panel Services" },
