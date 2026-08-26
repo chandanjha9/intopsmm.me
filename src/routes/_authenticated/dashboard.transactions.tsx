@@ -82,12 +82,27 @@ function TransactionsPage() {
 
   const totals = useMemo(() => {
     const list = Array.isArray(transactions) ? transactions : [];
-    const credited = list
-      .filter((t) => t.type !== "debit")
+    const isRefund = (t: any) =>
+      t.type === "credit" &&
+      t.description &&
+      (t.description.toLowerCase().includes("refund") ||
+       t.description.toLowerCase().includes("cancel"));
+
+    const manualAdded = list
+      .filter((t) => t.type === "credit" && !isRefund(t))
       .reduce((sum, t) => sum + Number(t.amount), 0);
-    const debited = list
+    
+    const spentOnOrders = list
       .filter((t) => t.type === "debit")
       .reduce((sum, t) => sum + Number(t.amount), 0);
+    
+    const refundedAmt = list
+      .filter(isRefund)
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const debited = Math.max(0, spentOnOrders - refundedAmt);
+    const credited = manualAdded;
+
     return { credited, debited };
   }, [transactions]);
 

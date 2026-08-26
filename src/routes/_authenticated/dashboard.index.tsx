@@ -321,33 +321,34 @@ function DashboardPage() {
                   </Field>
                 </div>
 
-                {/* Description */}
-                <div className="mt-4 rounded-2xl border border-primary/15 bg-primary/5 p-5">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-primary">Description</p>
-                  <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <DescRow Icon={Zap} label="Start Time" value="0 - 10 Minutes" />
-                    <DescRow
-                      Icon={Gauge}
-                      label="Quantity range"
-                      value={`${service.min_quantity.toLocaleString("en-IN")} - ${service.max_quantity.toLocaleString("en-IN")}`}
-                    />
-                    <DescRow
-                      Icon={ShieldCheck}
-                      label="Refill"
-                      value={service.refill_supported ? "Supported" : "Not available"}
-                    />
-                    <DescRow
-                      Icon={Droplets}
-                      label="Cancel"
-                      value={service.cancel_supported ? "Supported" : "Not available"}
-                    />
-                    <DescRow Icon={BadgeCheck} label="Platform" value={service.platform ?? "Global"} />
-                    <DescRow
-                      Icon={Globe2}
-                      label="More About Service"
-                      value={service.description ?? "See service name for full details"}
-                    />
-                  </ul>
+                {/* Description Layout */}
+                <div className="mt-4 flex flex-col lg:flex-row gap-4">
+                  {/* Left Column: Badges */}
+                  <div className="flex flex-col gap-2 lg:w-1/3 shrink-0">
+                    <DescBadge Icon={Zap} label="Start Time" value={(() => {
+                      const m = service.name.match(/Start:\s*([^|]+)/i) || service.name.match(/Start\s*([^|]+)/i);
+                      return m ? m[1].trim() : "0 - 10 Minutes";
+                    })()} />
+                    <DescBadge Icon={Gauge} label="Quantity" value={`${service.min_quantity.toLocaleString("en-IN")} - ${service.max_quantity.toLocaleString("en-IN")}`} />
+                    <DescBadge Icon={ShieldCheck} label="Refill" value={service.refill_supported ? "Supported" : "Not Required"} />
+                    <DescBadge Icon={Droplets} label="Cancel" value={service.cancel_supported ? "Supported" : "Not available"} />
+                    <DescBadge Icon={BadgeCheck} label="Platform" value={service.platform ?? "Global"} />
+                  </div>
+
+                  {/* Right Column: More About Service */}
+                  <div className="flex-1 rounded-xl border border-border/60 bg-secondary/30 p-4 text-sm">
+                    <div className="flex items-center gap-2 text-foreground font-semibold mb-3">
+                      <Globe2 className="h-4 w-4" />
+                      <span>More About Service</span>
+                    </div>
+                    <div className="text-muted-foreground leading-relaxed space-y-2 whitespace-pre-wrap">
+                      {service.description ? (
+                        <div dangerouslySetInnerHTML={{ __html: service.description }} />
+                      ) : (
+                        "See service name for full details."
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-4 grid gap-4">
@@ -595,22 +596,22 @@ function SelectPill({
   );
 }
 
-function DescRow({
+function DescBadge({
   Icon,
   label,
   value,
 }: {
   Icon: React.ComponentType<{ className?: string }>;
   label: string;
-  value: string;
+  value: React.ReactNode;
 }) {
   return (
-    <li className="flex items-center gap-2">
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-background/70 text-primary">
-        <Icon className="h-3.5 w-3.5" />
-      </span>
-      <span className="text-xs text-muted-foreground">{label}:</span>
-      <span className="truncate text-sm font-medium">{value}</span>
-    </li>
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-secondary/30 px-3 py-2.5">
+      <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+        <Icon className="h-4 w-4" />
+        <span className="text-sm font-medium">{label}</span>
+      </div>
+      <span className="text-sm font-semibold text-foreground text-right truncate">{value}</span>
+    </div>
   );
 }

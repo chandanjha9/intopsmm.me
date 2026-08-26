@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -51,9 +51,12 @@ export function DashboardShell({ active, children }: { active: string; children:
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile, user, logout } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
+
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const router = useRouter();
+  const isNavigating = useRouterState({ select: (state) => state.status === 'pending' });
   const checkAdmin = useServerFn(isCurrentUserAdmin);
 
   const { data: adminCheck } = useQuery({
@@ -102,6 +105,7 @@ export function DashboardShell({ active, children }: { active: string; children:
                 <Link
                   key={item.label}
                   to={item.to}
+                  onMouseEnter={() => router.preloadRoute({ to: item.to })}
                   onClick={() => setMenuOpen(false)}
                   className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                     isActive
@@ -133,8 +137,9 @@ export function DashboardShell({ active, children }: { active: string; children:
                 <Link
                   key={item.label}
                   to={item.to}
+                  onMouseEnter={() => router.preloadRoute({ to: item.to })}
                   onClick={() => setMenuOpen(false)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                  className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                     item.label === active
                       ? "bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow"
                       : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -175,6 +180,7 @@ export function DashboardShell({ active, children }: { active: string; children:
 
   return (
     <div className="min-h-screen bg-background">
+      <div className={`fixed top-0 inset-x-0 z-[100] h-1 bg-primary transition-opacity ${isNavigating ? "opacity-100" : "opacity-0"}`}></div>
       {/* Ambient background */}
       <div className="pointer-events-none fixed inset-0 -z-10 opacity-70">
         <div className="absolute -left-40 top-0 h-96 w-96 rounded-full bg-primary/20 blur-3xl" />
@@ -266,6 +272,7 @@ export function DashboardShell({ active, children }: { active: string; children:
               <Link
                 key={item.label}
                 to={item.to}
+                onMouseEnter={() => router.preloadRoute({ to: item.to })}
                 className={`flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${
                   tabActive
                     ? "text-primary"
