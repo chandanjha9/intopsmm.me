@@ -17,6 +17,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { Logo } from "@/components/ui/Logo";
 
 import { isFirebaseConfigured } from "@/lib/firebase";
 
@@ -109,11 +110,8 @@ function LoginPage() {
       <BrandingPane />
       <div className="flex items-center justify-center bg-background px-6 py-12">
         <div className="w-full max-w-md">
-          <Link to="/" className="mb-8 inline-flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
-              <TrendingUp className="h-5 w-5" />
-            </span>
-            <span className="text-lg font-bold">Intopsmm</span>
+          <Link to="/" className="mb-8 inline-flex items-center">
+            <Logo />
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
           <p className="mt-2 text-sm text-muted-foreground">

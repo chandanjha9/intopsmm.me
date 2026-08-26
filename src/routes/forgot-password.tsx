@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, Loader2, TrendingUp, ArrowRight, CheckCircle2 } from "lucide-react";
 import { BrandingPane } from "./login";
+import { Logo } from "@/components/ui/Logo";
 import { forgotPasswordServerFn } from "@/lib/auth/auth.functions";
 
 export const Route = createFileRoute("/forgot-password")({
@@ -53,11 +54,8 @@ function ForgotPasswordPage() {
       <BrandingPane />
       <div className="flex items-center justify-center bg-background px-6 py-12">
         <div className="w-full max-w-md">
-          <a href="/" className="mb-8 inline-flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
-              <TrendingUp className="h-5 w-5" />
-            </span>
-            <span className="text-lg font-bold">Intopsmm</span>
+          <a href="/" className="mb-8 inline-flex items-center">
+            <Logo />
           </a>
 
           {sent ? (

@@ -191,11 +191,8 @@ export function DashboardShell({ active, children }: { active: string; children:
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4 sm:px-6">
           {/* Brand */}
-          <Link to="/dashboard" className="inline-flex items-center gap-2 shrink-0">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
-              <TrendingUp className="h-4 w-4" />
-            </span>
-            <span className="text-base font-bold tracking-tight">Intopsmm</span>
+          <Link to="/dashboard" className="inline-flex items-center shrink-0">
+            <Logo className="h-8" />
           </Link>
 
           {/* Mobile: wallet balance pill in header */}
@@ -232,11 +229,8 @@ export function DashboardShell({ active, children }: { active: string; children:
           {/* Drawer panel */}
           <div className="absolute left-0 top-0 h-full w-[min(85vw,320px)] overflow-y-auto bg-background p-4 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-[image:var(--gradient-primary)] text-primary-foreground">
-                  <TrendingUp className="h-4 w-4" />
-                </span>
-                <span className="font-bold">Intopsmm</span>
+              <div className="flex items-center">
+                <Logo className="h-8" />
               </div>
               <button
                 onClick={() => setMenuOpen(false)}

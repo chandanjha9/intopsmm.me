@@ -112,6 +112,56 @@ const platforms = [
   },
 ];
 
+const getCustomDescription = (serviceName: string, defaultDesc: string | null) => {
+  const name = serviceName.toLowerCase();
+  
+  if (name.includes("reach") || name.includes("impression")) {
+    return `♞ This service increases both reach and impressions, improving post visibility and engagement.
+♞ Works for both Instagram posts and reels. Ensure you provide the correct URL.
+♞ Reach refers to unique users who see your content, while impressions count total views, including repeated ones.
+♞ Instagram analytics may take up to 24 hours to fully update after order completion.
+♞ Ensure your post or reel is public before ordering. Private, deleted, or restricted content will result in order failure.
+♞ No modifications after order placement. Orders process automatically and cannot be canceled.
+♞ Do not place another order for the same post until the first one is fully completed.
+♞ Delivery speed may fluctuate based on Instagram’s system demand and algorithm updates.`;
+  }
+  
+  if (name.includes("send") || name.includes("repost") || name.includes("share")) {
+    return `♞ This service boosts visibility by increasing the number of shares on your post or reel.
+♞ Shares help improve Instagram’s algorithm ranking, potentially increasing organic reach.
+♞ Works for both Instagram posts and reels. Ensure you provide the correct URL.
+♞ Ensure your post or reel is public before ordering. Private, deleted, or restricted content will result in order failure.
+♞ Instagram analytics for shares typically update within a few hours after order completion.
+♞ No modifications after order placement. Orders process automatically and cannot be canceled.
+♞ Do not place another order for the same post until the first one is fully completed.
+♞ Delivery speed may fluctuate based on Instagram’s system demand and algorithm update.`;
+  }
+  
+  if (name.includes("photo view")) {
+    return `♞ Ensure your post is public before ordering. Private, deleted, or restricted content will result in order failure.
+♞ No modifications after order placement. Once submitted, the order will process automatically.
+♞ Do not place a second order on the same link until the first one is fully completed.
+♞ Delivery speed may fluctuate. High server demand may slow processing, but orders are always completed.`;
+  }
+  
+  if (name.includes("follower")) {
+    return `♞ Supports all links, ensuring smooth and uninterrupted delivery.
+♞ Ensure your account is public before ordering. Private accounts will cause order failure.
+♞ Do not place a second order on the same link until the first one is fully completed.
+♞ Delivery speed may vary based on Instagram’s algorithm and system demand.`;
+  }
+  
+  if (name.includes("reel") || name.includes("like")) {
+    return `♞ Ensure your post or reel is public before ordering. Private, deleted, or restricted content will result in order failure.
+♞ No modifications after order placement. Once submitted, the order will process automatically.
+♞ Do not place a second order on the same link until the first one is fully completed.
+♞ Delivery speed may fluctuate. High server demand may slow processing, but orders are always completed.`;
+  }
+
+  // Fallback
+  return defaultDesc;
+};
+
 function DashboardPage() {
   const { profile, user, refreshProfile } = useAuth();
   const queryClient = useQueryClient();
@@ -342,11 +392,16 @@ function DashboardPage() {
                       <span>More About Service</span>
                     </div>
                     <div className="text-muted-foreground leading-relaxed space-y-2 whitespace-pre-wrap">
-                      {service.description ? (
-                        <div dangerouslySetInnerHTML={{ __html: service.description }} />
-                      ) : (
-                        "See service name for full details."
-                      )}
+                      {(() => {
+                        const customDesc = getCustomDescription(service.name, service.description);
+                        if (customDesc && customDesc.includes("♞")) {
+                          return customDesc;
+                        }
+                        if (customDesc) {
+                          return <div dangerouslySetInnerHTML={{ __html: customDesc }} />;
+                        }
+                        return "See service name for full details.";
+                      })()}
                     </div>
                   </div>
                 </div>

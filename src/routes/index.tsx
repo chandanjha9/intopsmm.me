@@ -1,9 +1,11 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { getMeServerFn } from "@/lib/auth/auth.functions";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Logo } from "@/components/ui/Logo";
 import featureFollowers from "@/assets/feature-followers.jpg";
 import featureEngagement from "@/assets/feature-engagement.jpg";
 import featurePricing from "@/assets/feature-pricing.jpg";
@@ -94,6 +96,15 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  const { session, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && session) {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [loading, session, navigate]);
+
   return (
     <div className="min-h-screen bg-page-tint text-foreground">
       <Nav />
@@ -130,13 +141,8 @@ function Nav() {
     <header className="sticky top-0 z-50 w-full">
       <div className="glass border-b border-border/60">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <a href="#home" className="flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
-              <TrendingUp className="h-5 w-5" />
-            </span>
-            <span className="text-lg font-bold tracking-tight">
-              Intop<span className="gradient-text">smm</span>
-            </span>
+          <a href="#home" className="flex items-center">
+            <Logo />
           </a>
           <nav className="hidden items-center gap-8 md:flex">
             {links.map((l) => (
@@ -1040,11 +1046,8 @@ function Footer() {
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-10 lg:grid-cols-6">
           <div className="lg:col-span-2">
-            <div className="flex items-center gap-2">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground">
-                <TrendingUp className="h-5 w-5" />
-              </span>
-              <span className="text-lg font-bold">Intopsmm</span>
+            <div className="flex items-center">
+              <Logo />
             </div>
             <p className="mt-4 max-w-sm text-sm text-muted-foreground">
               The fastest, most secure and fully automated SMM panel for creators, agencies and

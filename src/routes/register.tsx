@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { BrandingPane, GoogleMark } from "./login";
 import { useAuth } from "@/hooks/use-auth";
+import { Logo } from "@/components/ui/Logo";
 import { isFirebaseConfigured } from "@/lib/firebase";
 
 const signUpSchema = z.object({
@@ -127,11 +128,8 @@ function RegisterPage() {
       <BrandingPane />
       <div className="flex items-center justify-center bg-background px-6 py-12">
         <div className="w-full max-w-md">
-          <Link to="/" className="mb-8 inline-flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
-              <TrendingUp className="h-5 w-5" />
-            </span>
-            <span className="text-lg font-bold">Intopsmm</span>
+          <Link to="/" className="mb-8 inline-flex items-center">
+            <Logo />
           </Link>
 
           <div className="mb-6 flex items-center gap-2">
