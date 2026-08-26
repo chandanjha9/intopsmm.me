@@ -1,10 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/ui/Logo";
+import { isFirebaseConfigured } from "@/lib/firebase";
 import featureFollowers from "@/assets/feature-followers.jpg";
 import featureEngagement from "@/assets/feature-engagement.jpg";
 import featurePricing from "@/assets/feature-pricing.jpg";
@@ -40,6 +44,7 @@ import {
   Crown,
   CreditCard,
   HelpCircle,
+  Loader2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -221,36 +226,241 @@ function Hero() {
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-primary/20 blur-3xl" />
         <div className="absolute right-0 top-20 h-[28rem] w-[28rem] rounded-full bg-emerald-400/15 blur-3xl" />
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-70"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, oklch(0.72 0.19 148 / 0.12) 1px, transparent 1px), linear-gradient(to bottom, oklch(0.72 0.19 148 / 0.12) 1px, transparent 1px)",
+            backgroundSize: "52px 52px",
+          }}
+        />
       </div>
-      <div className="mx-auto max-w-4xl text-center">
-        <span className="inline-flex items-center gap-2 rounded-full bg-[image:var(--gradient-primary)] px-4 py-1.5 text-xs font-bold text-primary-foreground shadow-glow">
-          <Globe2 className="h-3.5 w-3.5" /> #1 Best SMM Panel
-        </span>
-        <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-tight sm:text-6xl">
-          Intopsmm — The Fastest &amp; Cheapest{" "}
-          <span className="gradient-text">SMM Panel</span> for Social Media Growth
-        </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
-          Boost your social media game and dominate the digital world with{" "}
-          <b className="text-foreground">Intopsmm</b> — your trusted partner for unbeatable
-          growth strategies and professional support.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Button asChild variant="hero" size="lg">
-            <Link to="/register">
-              <Sparkles className="mr-2 h-4 w-4" /> Create Account!
-            </Link>
-          </Button>
-          <Button asChild variant="complementary" size="lg">
-            <a href="#services">
-              <BarChart3 className="mr-2 h-4 w-4" /> Services
-            </a>
-          </Button>
+      <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="text-center lg:text-left">
+          <span className="inline-flex items-center gap-2 rounded-full bg-[image:var(--gradient-primary)] px-4 py-1.5 text-xs font-bold text-primary-foreground shadow-glow">
+            <Globe2 className="h-3.5 w-3.5" /> #1 Best SMM Panel
+          </span>
+          <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-tight sm:text-6xl">
+            Intopsmm — The Fastest &amp; Cheapest{" "}
+            <span className="gradient-complementary-text">SMM Panel</span> for Social Media Growth
+          </h1>
+          <p className="mt-5 max-w-2xl text-lg text-muted-foreground lg:text-foreground/75">
+            Boost your social media game and dominate the digital world with{" "}
+            <b className="text-foreground">Intopsmm</b> — your trusted partner for unbeatable growth
+            strategies and professional support.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+            <Button asChild variant="hero" size="lg">
+              <Link to="/register">
+                <Sparkles className="mr-2 h-4 w-4" /> Get Started Free
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="lg" className="bg-white/10">
+              <a href="#services">
+                <BarChart3 className="mr-2 h-4 w-4" /> View Services
+              </a>
+            </Button>
+          </div>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm font-semibold text-muted-foreground lg:justify-start">
+            <span className="before:mr-2 before:text-complementary before:content-['•']">
+              50,000+ Customers
+            </span>
+            <span className="before:mr-2 before:text-complementary before:content-['•']">
+              Secure Payments
+            </span>
+            <span className="before:mr-2 before:text-complementary before:content-['•']">
+              Instant Delivery
+            </span>
+          </div>
         </div>
+        <LandingLoginCard />
+      </div>
+    </section>
+  );
+}
+
+function LandingLoginCard() {
+  const navigate = useNavigate();
+  const { login, loginWithGoogle } = useAuth();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+
+    if (!username.trim() || !password) {
+      setError("Please enter username/email and password.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await login(username.trim(), password);
+      toast.success("Welcome back!");
+      navigate({ to: "/dashboard", replace: true });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to sign in");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError(null);
+    if (!isFirebaseConfigured) {
+      toast.info("Google Sign-In is coming soon! Please sign in with username/email and password.");
+      return;
+    }
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+      toast.success("Signed in with Google!");
+      navigate({ to: "/dashboard", replace: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Google sign-in failed";
+      if (!message.includes("popup-closed") && !message.includes("cancelled")) {
+        setError(message);
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  return (
+    <Card className="mx-auto w-full max-w-[420px] rounded-[1.75rem] border-white/80 bg-white p-8 shadow-[0_25px_70px_-35px_rgba(15,23,42,0.45)] sm:p-9">
+      <div>
+        <h2 className="text-2xl font-extrabold tracking-tight text-foreground">Welcome Back 👋</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          No account?{" "}
+          <Link to="/register" className="font-bold text-primary hover:underline">
+            Sign up free
+          </Link>
+        </p>
       </div>
 
+      <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
+        <div className="space-y-2">
+          <Label
+            htmlFor="landing-username"
+            className="text-xs font-bold uppercase tracking-widest text-foreground/70"
+          >
+            Username
+          </Label>
+          <Input
+            id="landing-username"
+            type="text"
+            autoComplete="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="Your username"
+            className="h-11 rounded-xl border-primary/20 bg-accent/30 px-4"
+            disabled={submitting || googleLoading}
+          />
+        </div>
 
-    </section>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label
+              htmlFor="landing-password"
+              className="text-xs font-bold uppercase tracking-widest text-foreground/70"
+            >
+              Password
+            </Label>
+          </div>
+          <div className="relative">
+            <Input
+              id="landing-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••"
+              className="h-11 rounded-xl border-primary/20 bg-accent/30 px-4 pr-28"
+              disabled={submitting || googleLoading}
+            />
+            <Link
+              to="/forgot-password"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-primary hover:underline"
+            >
+              Password Lost?
+            </Link>
+          </div>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Checkbox id="landing-remember" /> Remember me
+        </label>
+
+        {error && (
+          <p
+            role="alert"
+            className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {error}
+          </p>
+        )}
+
+        <Button
+          type="submit"
+          variant="hero"
+          size="lg"
+          className="h-12 w-full text-base font-extrabold"
+          disabled={submitting || googleLoading}
+        >
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
+        </Button>
+      </form>
+
+      <div className="relative my-6 flex items-center gap-3">
+        <div className="flex-1 border-t border-border" />
+        <span className="text-xs text-muted-foreground">or continue with</span>
+        <div className="flex-1 border-t border-border" />
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        className="h-11 w-full gap-2 rounded-xl bg-white shadow-soft"
+        onClick={handleGoogleLogin}
+        disabled={googleLoading || submitting}
+      >
+        {googleLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <GoogleMark className="h-4 w-4" />
+        )}
+        Continue with Google
+      </Button>
+    </Card>
+  );
+}
+
+function GoogleMark({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" aria-hidden>
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.3 17.6 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.5 24.5c0-1.6-.1-2.8-.4-4.1H24v8.4h12.7c-.3 2.1-1.6 5.2-4.7 7.3l7.6 5.9c4.5-4.2 6.9-10.3 6.9-17.5z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.4 28.7A14.7 14.7 0 0 1 9.6 24c0-1.6.3-3.2.8-4.7l-7.8-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.8-6.1z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.5 0 11.9-2.1 15.6-5.9l-7.6-5.9c-2 1.4-4.8 2.4-8 2.4-6.4 0-11.7-3.8-13.6-9.9l-7.8 6.1C6.5 42.6 14.6 48 24 48z"
+      />
+    </svg>
   );
 }
 
@@ -379,13 +589,7 @@ function InsightCards() {
 }
 
 /* ---------------- BEST SELLING ---------------- */
-function BrandIcon({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+function BrandIcon({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <span
       className={`grid h-14 w-14 place-items-center rounded-2xl text-white shadow-md ${className}`}
@@ -397,7 +601,15 @@ function BrandIcon({
 
 function InstagramLogo() {
   return (
-    <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className="h-7 w-7"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
       <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
       <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
@@ -540,7 +752,6 @@ function BestSelling() {
     </section>
   );
 }
-
 
 /* ---------------- NUMBERS ---------------- */
 function NumbersCard() {
@@ -996,8 +1207,8 @@ function CTASection() {
         <Card className="border-border/60 bg-[image:var(--gradient-primary)] p-10 text-center text-primary-foreground shadow-glow sm:p-14">
           <h2 className="text-3xl font-extrabold sm:text-4xl">Register Now and Get High Bonus!</h2>
           <p className="mx-auto mt-4 max-w-3xl text-sm opacity-90">
-            Enhance your social media presence with Intopsmm services. Sign up now to access a
-            wide range of tools designed to boost your online visibility and engagement. Join us and
+            Enhance your social media presence with Intopsmm services. Sign up now to access a wide
+            range of tools designed to boost your online visibility and engagement. Join us and
             watch your social media accounts thrive!
           </p>
           <Button asChild size="lg" variant="complementary" className="mt-8 font-bold">

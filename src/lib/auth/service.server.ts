@@ -59,7 +59,9 @@ export async function registerUser(input: {
   let derivedUsername: string;
   if (rawUsername) {
     if (!/^[a-zA-Z0-9_]{3,30}$/.test(rawUsername)) {
-      throw new Error("Username must be 3-30 characters long and contain only letters, numbers, and underscores.");
+      throw new Error(
+        "Username must be 3-30 characters long and contain only letters, numbers, and underscores.",
+      );
     }
     const existingUsername = await db
       .request()
@@ -91,8 +93,7 @@ export async function registerUser(input: {
     .input("passwordHash", sql.NVarChar, passwordHash)
     .input("username", sql.NVarChar, finalUsername)
     .input("fullName", sql.NVarChar, fullName)
-    .input("role", sql.NVarChar, role)
-    .query(`
+    .input("role", sql.NVarChar, role).query(`
       BEGIN TRANSACTION;
 
       DECLARE @newUserId UNIQUEIDENTIFIER = NEWID();
@@ -156,17 +157,11 @@ export async function registerUser(input: {
   };
 }
 
-export async function loginUser(input: {
-  email: string;
-  password: string;
-}): Promise<AuthResult> {
+export async function loginUser(input: { email: string; password: string }): Promise<AuthResult> {
   const db = await poolConnect;
-  const email = input.email.trim().toLowerCase();
+  const identifier = input.email.trim().toLowerCase();
 
-  const userResult = await db
-    .request()
-    .input("email", sql.NVarChar, email)
-    .query(`
+  const userResult = await db.request().input("identifier", sql.NVarChar, identifier).query(`
       SELECT 
         u.id, 
         u.email, 
@@ -180,17 +175,17 @@ export async function loginUser(input: {
       FROM users u
       LEFT JOIN profiles p ON u.id = p.id
       LEFT JOIN user_roles ur ON u.id = ur.user_id
-      WHERE u.email = @email
+      WHERE LOWER(u.email) = @identifier OR LOWER(p.username) = @identifier
     `);
 
   const row = userResult.recordset[0];
   if (!row || !row.password_hash) {
-    throw new Error("Invalid email or password");
+    throw new Error("Invalid username/email or password");
   }
 
   const passwordValid = await verifyPassword(input.password, row.password_hash);
   if (!passwordValid) {
-    throw new Error("Invalid email or password");
+    throw new Error("Invalid username/email or password");
   }
 
   const role: "admin" | "moderator" | "user" =
@@ -229,10 +224,7 @@ export async function loginUser(input: {
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   const db = await poolConnect;
 
-  const result = await db
-    .request()
-    .input("userId", sql.UniqueIdentifier, userId)
-    .query(`
+  const result = await db.request().input("userId", sql.UniqueIdentifier, userId).query(`
       SELECT 
         u.id, 
         u.email, 
@@ -316,8 +308,7 @@ export async function createPasswordResetToken(
     .request()
     .input("userId", sql.UniqueIdentifier, row.id)
     .input("tokenHash", sql.NVarChar, tokenHash)
-    .input("expiresAt", sql.DateTimeOffset, expiresAt)
-    .query(`
+    .input("expiresAt", sql.DateTimeOffset, expiresAt).query(`
       INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
       VALUES (@userId, @tokenHash, @expiresAt)
     `);
@@ -328,19 +319,13 @@ export async function createPasswordResetToken(
 /**
  * Verifies a reset token and updates the user's password.
  */
-export async function resetUserPassword(
-  token: string,
-  newPassword: string,
-): Promise<void> {
+export async function resetUserPassword(token: string, newPassword: string): Promise<void> {
   if (!token || token.length < 32) throw new Error("Invalid or expired reset link.");
 
   const db = await poolConnect;
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
-  const result = await db
-    .request()
-    .input("tokenHash", sql.NVarChar, tokenHash)
-    .query(`
+  const result = await db.request().input("tokenHash", sql.NVarChar, tokenHash).query(`
       SELECT t.id, t.user_id, t.expires_at, t.used
       FROM password_reset_tokens t
       WHERE t.token_hash = @tokenHash
@@ -348,7 +333,8 @@ export async function resetUserPassword(
 
   const row = result.recordset[0];
   if (!row || row.used) throw new Error("This reset link has already been used or is invalid.");
-  if (new Date(row.expires_at) < new Date()) throw new Error("This reset link has expired. Please request a new one.");
+  if (new Date(row.expires_at) < new Date())
+    throw new Error("This reset link has expired. Please request a new one.");
 
   const passwordHash = await hashPassword(newPassword);
 
@@ -356,8 +342,7 @@ export async function resetUserPassword(
     .request()
     .input("userId", sql.UniqueIdentifier, row.user_id)
     .input("passwordHash", sql.NVarChar, passwordHash)
-    .input("tokenId", sql.UniqueIdentifier, row.id)
-    .query(`
+    .input("tokenId", sql.UniqueIdentifier, row.id).query(`
       UPDATE users SET password_hash = @passwordHash, updated_at = SYSDATETIMEOFFSET()
       WHERE id = @userId;
       UPDATE password_reset_tokens SET used = 1 WHERE id = @tokenId;
@@ -379,10 +364,7 @@ export async function upsertGoogleUser(input: {
   const cleanEmail = input.email.trim().toLowerCase();
 
   // Check if user already exists
-  const existing = await db
-    .request()
-    .input("email", sql.NVarChar, cleanEmail)
-    .query(`
+  const existing = await db.request().input("email", sql.NVarChar, cleanEmail).query(`
       SELECT u.id, u.email, p.username, p.full_name, p.avatar_url, p.wallet_balance, ur.role
       FROM users u
       LEFT JOIN profiles p ON u.id = p.id
@@ -414,8 +396,17 @@ export async function upsertGoogleUser(input: {
       role,
     };
 
-    const token = signToken({ sub: profile.id, email: profile.email, role, username: profile.username });
-    return { user: { id: profile.id, email: profile.email, role, username: profile.username }, profile, token };
+    const token = signToken({
+      sub: profile.id,
+      email: profile.email,
+      role,
+      username: profile.username,
+    });
+    return {
+      user: { id: profile.id, email: profile.email, role, username: profile.username },
+      profile,
+      token,
+    };
   }
 
   // Create new user (no password — Google accounts have NULL password_hash)
@@ -428,8 +419,7 @@ export async function upsertGoogleUser(input: {
     .input("username", sql.NVarChar, derivedUsername)
     .input("fullName", sql.NVarChar, input.fullName ?? null)
     .input("avatarUrl", sql.NVarChar, input.avatarUrl ?? null)
-    .input("role", sql.NVarChar, role)
-    .query(`
+    .input("role", sql.NVarChar, role).query(`
       BEGIN TRANSACTION;
       DECLARE @newId UNIQUEIDENTIFIER = NEWID();
       INSERT INTO users (id, email, password_hash, email_confirmed_at)
@@ -455,6 +445,15 @@ export async function upsertGoogleUser(input: {
     role,
   };
 
-  const token = signToken({ sub: profile.id, email: profile.email, role, username: profile.username });
-  return { user: { id: profile.id, email: profile.email, role, username: profile.username }, profile, token };
+  const token = signToken({
+    sub: profile.id,
+    email: profile.email,
+    role,
+    username: profile.username,
+  });
+  return {
+    user: { id: profile.id, email: profile.email, role, username: profile.username },
+    profile,
+    token,
+  };
 }

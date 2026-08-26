@@ -13,7 +13,7 @@ import {
 import { requireAuth } from "./auth-middleware";
 
 const loginSchema = z.object({
-  email: z.string().trim().email("Please enter a valid email address"),
+  email: z.string().trim().min(3, "Please enter your email or username"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
