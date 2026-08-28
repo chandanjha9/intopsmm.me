@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { WhatsAppFab } from "@/components/WhatsAppFab";
+import { RouteProgress } from "@/components/RouteProgress";
 import { AuthProvider } from "@/hooks/use-auth";
 import { LanguageProvider } from "@/hooks/use-language";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -158,6 +159,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <LanguageProvider>
+          <RouteProgress />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
           <WhatsAppFab />

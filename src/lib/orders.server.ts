@@ -357,6 +357,28 @@ export async function requestOrderRefill(userId: string, orderId: string): Promi
   if (order.status !== "completed") throw new Error("Only completed orders can be refilled");
   if (!order.provider_order_id) throw new Error("This order cannot be refilled");
 
+  // One refill at a time per order + a 24 hour cooldown between requests.
+  const existing = await db
+    .request()
+    .input("orderId", sql.UniqueIdentifier, orderId)
+    .query(`
+      SELECT TOP 1 status, created_at
+      FROM refill_requests
+      WHERE order_id = @orderId
+      ORDER BY created_at DESC
+    `);
+  const last = existing.recordset[0];
+  if (last) {
+    const lastStatus = String(last.status ?? "").toLowerCase();
+    if (lastStatus !== "failed" && lastStatus !== "completed") {
+      throw new Error("A refill request for this order is already in progress.");
+    }
+    const elapsed = Date.now() - new Date(last.created_at).getTime();
+    if (elapsed < 24 * 60 * 60 * 1000) {
+      throw new Error("You can request another refill for this order after 24 hours.");
+    }
+  }
+
   const insertResult = await db
     .request()
     .input("orderId", sql.UniqueIdentifier, orderId)

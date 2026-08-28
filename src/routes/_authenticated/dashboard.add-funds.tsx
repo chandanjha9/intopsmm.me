@@ -24,6 +24,7 @@ import {
   fetchStaticQrCode,
   startRazorpayCheckout,
   confirmRazorpayPayment,
+  checkWalletTopup,
 } from "@/lib/payments.functions";
 import { toast } from "sonner";
 
@@ -49,14 +50,19 @@ export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
 const QUICK_AMOUNTS = [20, 50, 100, 250, 500, 1000];
 const MIN_AMOUNT = 20;
 const MAX_AMOUNT = 200000;
+const PENDING_KEY = "rzp_pending_order";
 
 type PayMethod = "upi" | "razorpay";
 
 declare global {
   interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void;
+      on: (event: string, cb: (payload: unknown) => void) => void;
+    };
   }
 }
+
 
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -76,14 +82,16 @@ function AddFundsPage() {
   const [agreed, setAgreed] = useState(true);
   const [utrNumber, setUtrNumber] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
-  const { refreshProfile } = useAuth();
+  const { refreshProfile, profile } = useAuth();
   const queryClient = useQueryClient();
 
   const submitStaticPayment = useServerFn(submitStaticUpiPayment);
   const startRazorpay = useServerFn(startRazorpayCheckout);
   const confirmRazorpay = useServerFn(confirmRazorpayPayment);
   const getQrCode = useServerFn(fetchStaticQrCode);
+  const checkTopup = useServerFn(checkWalletTopup);
 
   // Load static QR code server-side details on mount
   const qrQuery = useQuery({
@@ -99,6 +107,86 @@ function AddFundsPage() {
     void refreshProfile();
   }, [refreshProfile]);
 
+  // Result of the mobile Razorpay redirect flow (?pay=success|failed|pending)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const pay = url.searchParams.get("pay");
+    if (!pay) return;
+    if (pay === "success") {
+      toast.success("Payment successful! Wallet credited.");
+      void refreshProfile();
+      void queryClient.invalidateQueries({ queryKey: ["my-topups"] });
+      setMethod("razorpay");
+    } else if (pay === "pending") {
+      toast.info("Payment received — wallet will be credited in a moment.");
+      setMethod("razorpay");
+    } else {
+      toast.error("Payment was not completed. No amount was deducted.");
+      setMethod("razorpay");
+    }
+    url.searchParams.delete("pay");
+    window.history.replaceState({}, "", url.pathname + url.search);
+  }, [refreshProfile, queryClient]);
+
+
+  // Auto-credit watcher: keeps checking a started Razorpay payment until the
+  // server (checkout verification or the payment.captured webhook) marks it
+  // paid, then refreshes the wallet balance without any user action.
+  useEffect(() => {
+    if (!pendingOrderId) return;
+    let cancelled = false;
+    const startedAt = Date.now();
+
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const res = await checkTopup({ data: { paymentOrderId: pendingOrderId } });
+        if (cancelled) return;
+        if (res.status === "paid") {
+          setPendingOrderId(null);
+          if (typeof window !== "undefined") window.localStorage.removeItem(PENDING_KEY);
+          setAmount("");
+          setIsSubmitting(false);
+          toast.success("Payment successful! Wallet credited automatically.");
+          void refreshProfile();
+          void queryClient.invalidateQueries({ queryKey: ["my-topups"] });
+          return;
+        }
+        if (res.status === "failed") {
+          setPendingOrderId(null);
+          if (typeof window !== "undefined") window.localStorage.removeItem(PENDING_KEY);
+          setIsSubmitting(false);
+          return;
+        }
+      } catch {
+        /* keep retrying */
+      }
+      if (Date.now() - startedAt > 10 * 60 * 1000) {
+        setPendingOrderId(null);
+        if (typeof window !== "undefined") window.localStorage.removeItem(PENDING_KEY);
+        return;
+      }
+      timer = window.setTimeout(tick, 4000);
+    };
+
+    let timer = window.setTimeout(tick, 2500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [pendingOrderId, checkTopup, refreshProfile, queryClient]);
+
+  // Resume watching a payment that was started before a redirect to a UPI app.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(PENDING_KEY);
+    if (saved) {
+      setPendingOrderId(saved);
+      setMethod("razorpay");
+    }
+  }, []);
+
   const amountError =
     amount !== "" && (amt < MIN_AMOUNT || amt > MAX_AMOUNT)
       ? `Enter an amount between ₹${MIN_AMOUNT} and ₹${fmt.format(MAX_AMOUNT)}`
@@ -110,11 +198,21 @@ function AddFundsPage() {
   const handleRazorpay = async () => {
     if (!amountReady || !agreed || isSubmitting) return;
     setIsSubmitting(true);
+    let opened = false;
     try {
       const ok = await loadRazorpayScript();
       if (!ok || !window.Razorpay) throw new Error("Could not load the payment window. Check your connection.");
 
       const session = await startRazorpay({ data: { amount: amt } });
+      if (session.paymentOrderId) {
+        window.localStorage.setItem(PENDING_KEY, session.paymentOrderId);
+        setPendingOrderId(session.paymentOrderId);
+      }
+
+      // On phones the UPI app takes over the tab, so the JS handler never runs.
+      // Razorpay then POSTs back to callback_url, which verifies and credits.
+      const isMobile =
+        typeof navigator !== "undefined" && /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
 
       const rzp = new window.Razorpay({
         key: session.keyId,
@@ -124,36 +222,78 @@ function AddFundsPage() {
         description: `Wallet top-up of Rs ${session.amount}`,
         order_id: session.razorpayOrderId,
         theme: { color: "#10b981" },
-        handler: async (response: {
-          razorpay_order_id: string;
-          razorpay_payment_id: string;
-          razorpay_signature: string;
-        }) => {
-          try {
-            await confirmRazorpay({
-              data: {
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                razorpaySignature: response.razorpay_signature,
-              },
-            });
-            toast.success("Payment successful! Wallet credited.");
-            setAmount("");
-            await queryClient.invalidateQueries({ queryKey: ["my-topups"] });
-            void refreshProfile();
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Payment verification failed.");
-          }
+        prefill: {
+          name: profile?.full_name || profile?.username || "",
+          email: profile?.email || "",
+          contact: "",
         },
-        modal: { ondismiss: () => setIsSubmitting(false) },
+        notes: { purpose: "wallet_topup" },
+        remember_customer: false,
+        retry: { enabled: false },
+        // Show UPI (incl. scannable QR on desktop), cards, netbanking and wallets.
+        method: { upi: true, card: true, netbanking: true, wallet: true, paylater: false },
+        ...(isMobile
+          ? {
+              redirect: true,
+              callback_url: `${window.location.origin}/api/public/pay/razorpay-return`,
+            }
+          : {
+              redirect: false,
+              handler: async (response: {
+                razorpay_order_id: string;
+                razorpay_payment_id: string;
+                razorpay_signature: string;
+              }) => {
+                if (!response?.razorpay_payment_id || !response?.razorpay_signature) {
+                  setIsSubmitting(false);
+                  toast.error("Payment was not completed.");
+                  return;
+                }
+                try {
+                  await confirmRazorpay({
+                    data: {
+                      razorpayOrderId: response.razorpay_order_id,
+                      razorpayPaymentId: response.razorpay_payment_id,
+                      razorpaySignature: response.razorpay_signature,
+                    },
+                  });
+                  toast.success("Payment successful! Wallet credited.");
+                  setAmount("");
+                  await queryClient.invalidateQueries({ queryKey: ["my-topups"] });
+                  void refreshProfile();
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Payment verification failed.");
+                } finally {
+                  setIsSubmitting(false);
+                }
+              },
+            }),
+        modal: {
+          escape: false,
+          confirm_close: true,
+          ondismiss: () => {
+            setIsSubmitting(false);
+            toast.info("Payment cancelled.");
+          },
+        },
       });
+
+      rzp.on("payment.failed", () => {
+        setIsSubmitting(false);
+        toast.error("Payment failed. No amount was deducted from your wallet.");
+      });
+
       rzp.open();
+      opened = true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not start the payment.");
     } finally {
-      setIsSubmitting(false);
+      // Keep the button locked while the Razorpay window is open; it is
+      // released by ondismiss / handler / payment.failed.
+      if (!opened) setIsSubmitting(false);
     }
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

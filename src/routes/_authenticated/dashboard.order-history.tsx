@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,9 +18,10 @@ import {
   LineChart,
   Ban,
   ExternalLink,
+  RefreshCcw,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { listMyOrders } from "@/lib/orders.functions";
+import { listMyOrders, refillOrder } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/_authenticated/dashboard/order-history")({
   head: () => ({
@@ -115,6 +117,34 @@ function OrderHistoryPage() {
     }, 5000);
     return () => clearInterval(timer);
   }, [refreshProfile]);
+
+  const queryClient = useQueryClient();
+  const submitRefill = useServerFn(refillOrder);
+  const refillMutation = useMutation({
+    mutationFn: (orderId: string) => submitRefill({ data: { orderId } }),
+    onSuccess: () => {
+      toast.success("Refill requested. Track its status on the Refill page.");
+      queryClient.invalidateQueries({ queryKey: ["my-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["my-refills"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const refillState = (order: (typeof orders)[number]) => {
+    const service = Array.isArray(order.services) ? order.services[0] : order.services;
+    if (order.status !== "completed" || !service?.refill_supported) return null;
+    const status = (order.last_refill_status ?? "").toLowerCase();
+    const at = order.last_refill_at ? new Date(order.last_refill_at).getTime() : 0;
+    const withinCooldown = at > 0 && Date.now() - at < 24 * 60 * 60 * 1000;
+    if (status && status !== "failed" && status !== "completed") {
+      return { disabled: true, label: "Refill pending" };
+    }
+    if (withinCooldown) {
+      const hoursLeft = Math.max(1, Math.ceil((24 * 60 * 60 * 1000 - (Date.now() - at)) / 3_600_000));
+      return { disabled: true, label: `Refill in ${hoursLeft}h` };
+    }
+    return { disabled: false, label: "Refill" };
+  };
 
   const displayId = (order: (typeof orders)[number]) => {
     const links = (order as { provider_orders?: { provider_order_id: string | null }[] | { provider_order_id: string | null } | null })
@@ -283,6 +313,29 @@ function OrderHistoryPage() {
                   </td>
                   <td className="whitespace-nowrap px-4 py-4 text-right font-semibold">
                     {inr(Number(order.charge ?? 0))}
+                    {(() => {
+                      const state = refillState(order);
+                      if (!state) return null;
+                      const busy = refillMutation.isPending && refillMutation.variables === order.id;
+                      return (
+                        <div className="mt-2 flex justify-end">
+                          <Button
+                            size="sm"
+                            variant={state.disabled ? "outline" : "default"}
+                            disabled={state.disabled || busy}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              refillMutation.mutate(order.id);
+                            }}
+                          >
+                            <RefreshCcw
+                              className={`mr-1.5 h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`}
+                            />
+                            {busy ? "Requesting" : state.label}
+                          </Button>
+                        </div>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))}

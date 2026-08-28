@@ -81,10 +81,18 @@ export const listMyOrders = createServerFn({ method: "GET" })
           o.service_id,
           s.refill_supported,
           s.cancel_supported,
-          po.provider_order_id
+          po.provider_order_id,
+          rr.status AS last_refill_status,
+          rr.created_at AS last_refill_at
         FROM orders o
         LEFT JOIN services s ON o.service_id = s.id
         LEFT JOIN provider_orders po ON o.id = po.order_id
+        OUTER APPLY (
+          SELECT TOP 1 r.status, r.created_at
+          FROM refill_requests r
+          WHERE r.order_id = o.id
+          ORDER BY r.created_at DESC
+        ) rr
         WHERE o.user_id = @userId
         ORDER BY o.created_at DESC
       `);
@@ -108,6 +116,8 @@ export const listMyOrders = createServerFn({ method: "GET" })
           }
         : null,
       provider_orders: row.provider_order_id ? { provider_order_id: row.provider_order_id } : null,
+      last_refill_status: (row.last_refill_status as string | null) ?? null,
+      last_refill_at: row.last_refill_at ? new Date(row.last_refill_at).toISOString() : null,
     }));
   });
 

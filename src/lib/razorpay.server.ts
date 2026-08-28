@@ -146,3 +146,38 @@ export async function handleRazorpayWebhookEvent(rawBody: string, signature: str
 
   return new Response("ok");
 }
+
+/**
+ * Handles Razorpay's `callback_url` POST (used on mobile, where the UPI intent
+ * unloads the page and the JS `handler` never runs). Verifies the checkout
+ * signature, credits the wallet once and redirects the user back.
+ */
+export async function handleRazorpayReturn(request: Request) {
+  const back = (q: string) =>
+    new Response(null, { status: 303, headers: { Location: `/dashboard/add-funds?${q}` } });
+
+  let orderId = "";
+  let paymentId = "";
+  let signature = "";
+  try {
+    const form = await request.formData();
+    orderId = String(form.get("razorpay_order_id") ?? "");
+    paymentId = String(form.get("razorpay_payment_id") ?? "");
+    signature = String(form.get("razorpay_signature") ?? "");
+  } catch {
+    return back("pay=failed");
+  }
+
+  if (!orderId || !paymentId || !signature) return back("pay=failed");
+
+  try {
+    const { keySecret } = creds();
+    const expected = createHmac("sha256", keySecret).update(`${orderId}|${paymentId}`).digest("hex");
+    if (!safeEqual(expected, signature)) return back("pay=failed");
+    await creditOnce({ razorpayOrderId: orderId, razorpayPaymentId: paymentId });
+    return back("pay=success");
+  } catch (err) {
+    console.error("[razorpay return] failed:", err);
+    return back("pay=pending");
+  }
+}

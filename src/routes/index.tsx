@@ -143,13 +143,33 @@ function Landing() {
 }
 
 /* ---------------- PROMO POPUP & STICKER ---------------- */
+const PROMO_SEEN_KEY = "promo_popup_last_shown";
+const PROMO_GAP_MS = 60 * 60 * 1000; // show again only after 1 hour
+
 function PromoPopup() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setOpen(true), 1200);
+    if (typeof window === "undefined") return;
+    let last = 0;
+    try {
+      last = Number(window.localStorage.getItem(PROMO_SEEN_KEY) ?? 0);
+    } catch {
+      last = 0;
+    }
+    if (Date.now() - last < PROMO_GAP_MS) return;
+
+    const timer = setTimeout(() => {
+      setOpen(true);
+      try {
+        window.localStorage.setItem(PROMO_SEEN_KEY, String(Date.now()));
+      } catch {
+        /* storage blocked — popup just shows again next visit */
+      }
+    }, 1200);
     return () => clearTimeout(timer);
   }, []);
+
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
