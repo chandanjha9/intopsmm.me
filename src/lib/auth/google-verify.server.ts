@@ -7,7 +7,6 @@
  * for our Firebase project.
  */
 
-const DEFAULT_FIREBASE_API_KEY = process.env["GOOGLE_API_KEY"] || "";
 const DEFAULT_FIREBASE_PROJECT_ID = "intopsmm-3ef46";
 
 export type VerifiedGoogleUser = {
@@ -18,8 +17,30 @@ export type VerifiedGoogleUser = {
 };
 
 export async function verifyGoogleIdToken(idToken: string): Promise<VerifiedGoogleUser> {
-  const apiKey = process.env["FIREBASE_API_KEY"] || DEFAULT_FIREBASE_API_KEY;
+  // Read env at call time — module-scope reads are empty in the edge runtime.
+  const apiKey =
+    process.env["FIREBASE_API_KEY"] ||
+    process.env["GOOGLE_API_KEY"] ||
+    process.env["VITE_FIREBASE_API_KEY"] ||
+    "";
   const projectId = process.env["FIREBASE_PROJECT_ID"] || DEFAULT_FIREBASE_PROJECT_ID;
+
+  if (!apiKey) {
+    throw new Error(
+      "Google sign-in failed: server is missing the Firebase API key (set GOOGLE_API_KEY).",
+    );
+  }
+
+  // Basic sanity checks before hitting Google.
+  const claims = decodeJwtPayload(idToken);
+  if (claims) {
+    if (claims["aud"] && claims["aud"] !== projectId) {
+      throw new Error("Google sign-in failed: token was issued for a different application.");
+    }
+    if (typeof claims["exp"] === "number" && claims["exp"] * 1000 < Date.now()) {
+      throw new Error("Google sign-in failed: session token expired, please try again.");
+    }
+  }
 
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
@@ -31,8 +52,18 @@ export async function verifyGoogleIdToken(idToken: string): Promise<VerifiedGoog
   );
 
   if (!res.ok) {
-    throw new Error("Google sign-in failed: invalid or expired session token.");
+    const detail = await res.text().catch(() => "");
+    let reason = "";
+    try {
+      reason = (JSON.parse(detail)?.error?.message as string) || "";
+    } catch {
+      reason = "";
+    }
+    throw new Error(
+      `Google sign-in failed${reason ? `: ${reason}` : ": invalid or expired session token."}`,
+    );
   }
+
 
   const body = (await res.json()) as {
     users?: Array<{
@@ -51,11 +82,8 @@ export async function verifyGoogleIdToken(idToken: string): Promise<VerifiedGoog
     throw new Error("Google sign-in failed: no verified account found for this token.");
   }
 
-  // Sanity check: token must belong to our Firebase project.
-  const claims = decodeJwtPayload(idToken);
-  if (claims && claims["aud"] && claims["aud"] !== projectId) {
-    throw new Error("Google sign-in failed: token was issued for a different application.");
-  }
+
+
 
   const google = user.providerUserInfo?.find((p) => p.providerId === "google.com");
 
