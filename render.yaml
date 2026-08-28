@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: growmesmm
+    runtime: node
+    buildCommand: bun install && bun run build
+    startCommand: node .output/server/index.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
