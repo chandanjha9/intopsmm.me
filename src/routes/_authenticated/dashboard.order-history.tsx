@@ -258,7 +258,11 @@ function OrderHistoryPage() {
                       <span className="truncate">{order.link}</span>
                     </a>
                     {order.error_message && (
-                      <p className="mt-1 text-xs text-destructive">{order.error_message}</p>
+                      <p className="mt-1 text-xs text-destructive">
+                        {["canceled", "cancelled", "refunded"].includes(String(order.status).toLowerCase())
+                          ? "Refunded"
+                          : order.error_message}
+                      </p>
                     )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-4 text-muted-foreground">

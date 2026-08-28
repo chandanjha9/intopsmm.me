@@ -153,13 +153,13 @@ function PromoPopup() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-md border-0 bg-[image:var(--gradient-primary)] p-0 text-primary-foreground sm:rounded-2xl">
+      <DialogContent className="max-w-md border-0 bg-[image:var(--gradient-primary)] p-0 text-primary-foreground sm:rounded-xl">
         <div className="relative overflow-hidden p-6 pt-8 text-center sm:p-8">
           <span className="absolute -right-6 -top-6 flex h-24 w-24 items-center justify-center rounded-full bg-white/20">
             <Gift className="h-10 w-10 text-white" />
           </span>
           <DialogHeader>
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white text-primary shadow-lg">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-xl bg-white text-primary shadow-lg">
               <Percent className="h-7 w-7" />
             </div>
             <DialogTitle className="mt-5 text-2xl font-bold text-white">
@@ -196,8 +196,8 @@ function PromoSticker() {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
-    <div className="fixed right-0 top-1/2 z-40 hidden -translate-y-1/2 flex-col items-end gap-2 md:flex">
-      <div className="relative overflow-hidden rounded-l-2xl bg-[image:var(--gradient-primary)] p-3 pl-4 pr-5 text-primary-foreground shadow-glow">
+    <div className="fixed bottom-4 right-4 z-40 hidden flex-col items-end gap-2 md:flex">
+      <div className="relative overflow-hidden rounded-xl bg-[image:var(--gradient-primary)] p-3 pl-4 pr-5 text-primary-foreground shadow-glow">
         <button
           onClick={() => setDismissed(true)}
           className="absolute right-1 top-1 rounded p-0.5 text-white/70 transition hover:bg-white/20 hover:text-white"
@@ -209,7 +209,7 @@ function PromoSticker() {
           <Tag className="h-5 w-5" />
           <div>
             <p className="text-xs font-bold leading-tight">30% OFF</p>
-            <p className="text-[10px] leading-tight text-white/85">First Order</p>
+            <p className="text-xs leading-tight text-white/85">First Order</p>
           </div>
         </div>
       </div>
@@ -264,7 +264,7 @@ export function Nav() {
           </div>
           <button
             aria-label="Toggle menu"
-            className="md:hidden rounded-md p-2 hover:bg-accent"
+            className="md:hidden rounded-xl p-2 hover:bg-accent"
             onClick={() => setOpen(!open)}
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -396,8 +396,8 @@ function HeroLoginCard() {
   };
 
   return (
-    <Card className="w-full max-w-[440px] rounded-2xl border-border/60 bg-card p-7 shadow-card">
-      <h2 className="text-xl font-bold tracking-tight">Welcome Back 👋</h2>
+    <Card className="w-full max-w-[400px] rounded-xl border-border/60 bg-card p-6 shadow-card">
+      <h2 className="text-base font-bold tracking-tight">Welcome back</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         No account?{" "}
         <Link to="/register" className="font-semibold text-primary hover:underline">
@@ -407,7 +407,7 @@ function HeroLoginCard() {
 
       <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-1">
-          <Label htmlFor="hero-email" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <Label htmlFor="hero-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Username
           </Label>
           <Input
@@ -422,14 +422,9 @@ function HeroLoginCard() {
           />
         </div>
         <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="hero-password" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Password
-            </Label>
-            <Link to="/forgot-password" className="text-[11px] font-medium text-primary hover:underline">
-              Password Lost?
-            </Link>
-          </div>
+          <Label htmlFor="hero-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Password
+          </Label>
           <Input
             id="hero-password"
             type="password"
@@ -440,6 +435,9 @@ function HeroLoginCard() {
             className="h-11 text-sm"
             required
           />
+          <Link to="/forgot-password" className="inline-block text-xs font-medium text-primary hover:underline">
+            Password lost?
+          </Link>
         </div>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <Checkbox id="hero-remember" defaultChecked className="h-4 w-4" /> Remember me
@@ -451,7 +449,7 @@ function HeroLoginCard() {
 
       <div className="relative my-5 flex items-center gap-2">
         <div className="flex-1 border-t border-border" />
-        <span className="text-[11px] text-muted-foreground">or continue with</span>
+        <span className="text-xs text-muted-foreground">or continue with</span>
         <div className="flex-1 border-t border-border" />
       </div>
 
@@ -492,9 +490,9 @@ function Hero() {
             growth strategies and professional support.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
-            <Button asChild size="lg" className="bg-white text-foreground hover:bg-white/90">
+            <Button asChild size="lg" variant="outline" className="border-white bg-transparent text-white hover:bg-white/15 hover:text-white">
               <Link to="/register">
-                <Sparkles className="mr-2 h-4 w-4" /> Create Account!
+                <Sparkles className="mr-2 h-4 w-4" /> Create account
               </Link>
             </Button>
           </div>
@@ -567,7 +565,7 @@ function WhyChoose() {
   return (
     <section id="why" className="px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <SectionHeading before="Why Choose " highlight="Intopsmm" after="?" />
+        <SectionHeading before="Our commitment to " highlight="your growth" />
         <Card className="glass mt-10 grid items-center gap-6 border-border/60 p-8 shadow-card md:grid-cols-[minmax(0,1fr)_260px]">
           <div>
             <h3 className="text-2xl font-bold">Swift and Seamless Solutions</h3>
@@ -576,7 +574,7 @@ function WhyChoose() {
               seamless automated solutions.
             </p>
           </div>
-          <div className="grid h-40 place-items-center rounded-2xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
+          <div className="grid h-40 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
             <Rocket className="h-16 w-16" />
           </div>
         </Card>
@@ -654,13 +652,13 @@ function NumbersCard() {
             {stats.map(({ Icon, title, value }) => (
               <div
                 key={title}
-                className="flex items-center gap-4 rounded-2xl bg-white/10 p-5 backdrop-blur"
+                className="flex items-center gap-4 rounded-xl bg-white/10 p-5 backdrop-blur"
               >
                 <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white/15">
                   <Icon className="h-6 w-6" />
                 </span>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest opacity-80">
+                  <p className="text-xs font-semibold tracking-wide opacity-80">
                     {title}
                   </p>
                   <p className="mt-1 text-xl font-extrabold">{value}</p>
@@ -686,34 +684,32 @@ function VsOthers() {
   ];
   return (
     <section className="bg-secondary/40 px-4 py-16 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <SectionHeading before="Intopsmm vs " highlight="Others" />
-        <div className="mt-10 space-y-3">
-          {rows.map(({ Icon, text }) => (
-            <Card
+      <div className="mx-auto max-w-4xl">
+        <SectionHeading highlight="Intopsmm" after=" vs Others" />
+        <div className="mt-10 overflow-hidden rounded-xl border border-border/60">
+          <div className="flex items-center gap-4 bg-card/80 px-4 py-3">
+            <span className="min-w-0 flex-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Feature
+            </span>
+            <span className="w-20 text-center text-xs font-semibold text-foreground">Intopsmm</span>
+            <span className="w-20 text-center text-xs font-semibold text-muted-foreground">Others</span>
+          </div>
+          {rows.map(({ Icon, text }, i) => (
+            <div
               key={text}
-              className="glass flex flex-col gap-4 border-border/60 p-4 shadow-card sm:flex-row sm:items-center"
+              className={`flex items-center gap-4 px-4 py-3 ${i % 2 === 1 ? "bg-card/50" : "bg-transparent"}`}
             >
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
-                <Icon className="h-5 w-5" />
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground">
+                <Icon className="h-4 w-4" />
               </span>
-              <div className="min-w-0 flex-1">
-                <small className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Feature
-                </small>
-                <p className="text-sm font-medium">{text}</p>
-              </div>
-              <div className="flex items-center gap-8 sm:ml-auto">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold">Intopsmm</span>
-                  <Check className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground">Others</h3>
-                  <XIcon className="h-5 w-5 text-destructive" />
-                </div>
-              </div>
-            </Card>
+              <p className="min-w-0 flex-1 text-sm font-medium">{text}</p>
+              <span className="grid w-20 place-items-center">
+                <Check className="h-5 w-5 text-primary" aria-label="Intopsmm: yes" />
+              </span>
+              <span className="grid w-20 place-items-center">
+                <XIcon className="h-5 w-5 text-destructive" aria-label="Others: no" />
+              </span>
+            </div>
           ))}
         </div>
       </div>
@@ -732,7 +728,7 @@ function Clientele() {
           {brands.map((b) => (
             <span
               key={b}
-              className="rounded-2xl border border-border/60 bg-card px-6 py-4 text-sm font-bold text-muted-foreground"
+              className="rounded-xl border border-border/60 bg-card px-6 py-4 text-sm font-bold text-muted-foreground"
             >
               {b}
             </span>
@@ -793,7 +789,7 @@ function Testimonials() {
     {
       text: "Intopsmm has truly changed the game for me! Their services are reliable and super affordable. My Instagram has seen real growth in just a few weeks.",
       name: "Deepak Sharma",
-      role: "Social Media Manager at TechMinds, Mumbai",
+      role: "Social Media Manager, Mumbai",
     },
     {
       text: "The ease of use and effectiveness of Intopsmm is amazing. My YouTube channel has grown significantly since I started using their services.",
@@ -808,7 +804,7 @@ function Testimonials() {
     {
       text: "I am very satisfied with the quality and speed of the services provided. The support team is always there to help, which is a huge plus.",
       name: "Sarah Johnson",
-      role: "Marketing Director at Bright Ideas Co., New York",
+      role: "Marketing Director, New York",
     },
   ];
   const rowB = [
@@ -830,26 +826,26 @@ function Testimonials() {
     {
       text: "I love how easy it is to use Intopsmm. The platform is straightforward and my Twitter engagement has skyrocketed.",
       name: "David Lee",
-      role: "Social Media Strategist at TrendSetters, Los Angeles",
+      role: "Social Media Strategist, LA",
     },
   ];
   const Row = ({ items }: { items: typeof rowA }) => (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       {items.map((t) => (
-        <Card key={t.name} className="glass flex flex-col border-border/60 p-6 shadow-card">
-          <div className="flex gap-0.5 text-primary">
+        <Card key={t.name} className="glass flex h-full flex-col border-border/60 p-6 shadow-card">
+          <div className="mb-1 flex gap-0.5 text-primary">
             {Array.from({ length: 5 }).map((_, i) => (
               <Star key={i} className="h-4 w-4 fill-current" />
             ))}
           </div>
-          <p className="mt-3 flex-1 text-sm text-muted-foreground">{t.text}</p>
-          <div className="mt-5 flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-[image:var(--gradient-primary)] text-sm font-bold text-primary-foreground">
+          <p className="mt-4 text-sm text-muted-foreground">{t.text}</p>
+          <div className="mt-auto flex items-center gap-3 pt-5">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[image:var(--gradient-primary)] text-sm font-bold text-primary-foreground">
               {t.name.charAt(0)}
             </span>
             <div className="min-w-0">
-              <h3 className="truncate text-sm font-bold">{t.name}</h3>
-              <span className="block truncate text-xs text-muted-foreground">{t.role}</span>
+              <h3 className="text-sm font-bold">{t.name}</h3>
+              <span className="block text-xs text-muted-foreground">{t.role}</span>
             </div>
           </div>
         </Card>
@@ -925,7 +921,7 @@ function PhoneMockup({ index }: { index: number }) {
             </div>
           </div>
           {/* Notification card */}
-          <div className="mx-4 mb-6 rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-md">
+          <div className="mx-4 mb-6 rounded-xl border border-white/10 bg-white/10 p-4 backdrop-blur-md">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-lg font-bold text-white">{s.top}</p>
@@ -1113,6 +1109,7 @@ function FAQSection() {
             <button
               key={t}
               onClick={() => setTab(t)}
+              aria-pressed={tab === t}
               className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
                 tab === t
                   ? "bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow"
@@ -1125,15 +1122,10 @@ function FAQSection() {
         </div>
         <div className="mt-8 grid gap-6 md:grid-cols-2">
           {faqTabs[tab].map((f) => (
-            <Card key={f.q} className="glass border-border/60 p-6 shadow-card">
-              <div className="flex items-center justify-between">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
-                  <HelpCircle className="h-5 w-5" />
-                </span>
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                  {tab}
-                </span>
-              </div>
+            <Card key={f.q} className="glass border-border/60 p-8 shadow-card">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[image:var(--gradient-primary)] text-primary-foreground shadow-glow">
+                <HelpCircle className="h-5 w-5" />
+              </span>
               <h3 className="mt-4 text-base font-bold">{f.q}</h3>
               <p className="mt-2 text-sm text-muted-foreground">{f.a}</p>
             </Card>
@@ -1157,7 +1149,7 @@ function CTASection() {
             wide range of tools designed to boost your online visibility and engagement. Join us and
             watch your social media accounts thrive!
           </p>
-          <Button asChild size="lg" variant="complementary" className="mt-8 font-bold">
+          <Button asChild size="lg" variant="secondary" className="mt-8 bg-white font-bold text-primary hover:bg-white/90">
             <Link to="/register">
               Register Now <ArrowRight className="ml-2 h-4 w-4" />
             </Link>

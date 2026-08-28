@@ -206,7 +206,7 @@ function DashboardPage() {
   const [platform, setPlatform] = useState("Instagram");
   const [category, setCategory] = useState<string>("");
   const [serviceId, setServiceId] = useState<string>("");
-  const [quantity, setQuantity] = useState("1000");
+  const [quantity, setQuantity] = useState("");
   const [link, setLink] = useState("");
   const [serviceSearch, setServiceSearch] = useState("");
 

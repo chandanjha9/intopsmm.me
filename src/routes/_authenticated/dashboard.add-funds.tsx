@@ -39,12 +39,12 @@ export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
   component: AddFundsPage,
 });
 
-const QUICK_AMOUNTS = [15, 50, 100, 250, 500, 1000];
-const MIN_AMOUNT = 15;
+const QUICK_AMOUNTS = [20, 50, 100, 250, 500, 1000];
+const MIN_AMOUNT = 20;
 const MAX_AMOUNT = 200000;
 
 function AddFundsPage() {
-  const [amount, setAmount] = useState("15");
+  const [amount, setAmount] = useState("");
   const [agreed, setAgreed] = useState(true);
   const [utrNumber, setUtrNumber] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -107,13 +107,13 @@ function AddFundsPage() {
         <div className="grid gap-4 p-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="min-w-0">
             <span className="inline-flex rounded-full bg-emerald-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-400">
-              UPI QR Code & UTR Verification
+              PhonePe QR Code & UTR Verification
             </span>
             <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
               ADD <span className="gradient-text">FUNDS</span>
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Scan the UPI QR code below, pay the amount, and submit the 12-digit UPI UTR number to get wallet credit.
+              Scan the QR code with PhonePe only, pay the amount, and submit the UTR number to get wallet credit.
             </p>
           </div>
           <span className="hidden h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-lg sm:grid">
@@ -145,6 +145,10 @@ function AddFundsPage() {
               ) : (
                 <p className="text-xs text-destructive">Failed to load QR code image.</p>
               )}
+
+              <div className="w-full max-w-[320px] rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-center text-[11px] font-semibold leading-relaxed text-amber-400">
+                𝗡𝗼𝘁𝗲- 𝗣𝗹𝗲𝗮𝘀𝗲 𝗽𝗮𝘆 𝘂𝘀𝗶𝗻𝗴 𝘁𝗵𝗶𝘀 𝗤𝗥 𝗰𝗼𝗱𝗲 𝗼𝗻𝗹𝘆 𝘄𝗶𝘁𝗵 𝗣𝗵𝗼𝗻𝗲𝗣𝗲. 𝗙𝗼𝗿 𝗼𝘁𝗵𝗲𝗿 𝗨𝗣𝗜 𝗮𝗽𝗽𝘀 𝘀𝗲𝗹𝗲𝗰𝘁 𝗮 𝗱𝗶𝗳𝗳𝗲𝗿𝗲𝗻𝘁 𝗽𝗮𝘆𝗺𝗲𝗻𝘁 𝗺𝗲𝘁𝗵𝗼𝗱.
+              </div>
             </div>
 
             {/* Payment Form */}
@@ -152,7 +156,7 @@ function AddFundsPage() {
               {/* Amount */}
               <div className="space-y-2">
                 <Label htmlFor="amount" className="text-sm font-semibold">
-                  Amount Paid (₹{MIN_AMOUNT} – ₹{fmt.format(MAX_AMOUNT)})
+                  Amount Paid (Minimum ₹{MIN_AMOUNT})
                 </Label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground">
@@ -237,21 +241,20 @@ function AddFundsPage() {
             <ol className="space-y-3 text-xs text-muted-foreground">
               <li className="flex gap-3">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400 text-[11px]">1</span>
-                <span>Scan the QR code or copy the UPI ID to make payment via any UPI app.</span>
+                <span><strong>Scan the QR Code</strong> with PhonePe only.</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400 text-[11px]">2</span>
-                <span>After payment, open your UPI app's receipt / transaction history.</span>
+                <span><strong>Enter amount to pay</strong> (minimum ₹{MIN_AMOUNT}).</span>
               </li>
               <li className="flex gap-3">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400 text-[11px]">3</span>
-                <span>Copy the <strong>12-digit UTR / Transaction ID</strong> from the receipt.</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400 text-[11px]">4</span>
-                <span>Enter the amount and UTR number in the form and click Submit. Wallet will be credited after verification.</span>
+                <span><strong>Include amount and Transaction ID</strong>, tick the Terms &amp; Condition box, and tap the pay button.</span>
               </li>
             </ol>
+            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-[11px] text-emerald-400 font-bold leading-relaxed text-center">
+              Pay Minimum: ₹{MIN_AMOUNT}
+            </div>
             <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-[11px] text-amber-400 font-medium leading-relaxed">
               ⚠️ Make sure to enter the correct UTR number. Wrong UTR submissions may result in delayed credit or account suspension.
             </div>
