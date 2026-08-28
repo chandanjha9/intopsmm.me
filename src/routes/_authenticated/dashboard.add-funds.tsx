@@ -14,10 +14,17 @@ import {
   QrCode,
   Sparkles,
   Check,
+  CreditCard,
+  Zap,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuth } from "@/hooks/use-auth";
-import { submitStaticUpiPayment, fetchStaticQrCode } from "@/lib/payments.functions";
+import {
+  submitStaticUpiPayment,
+  fetchStaticQrCode,
+  startRazorpayCheckout,
+  confirmRazorpayPayment,
+} from "@/lib/payments.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard/add-funds")({
@@ -43,7 +50,28 @@ const QUICK_AMOUNTS = [20, 50, 100, 250, 500, 1000];
 const MIN_AMOUNT = 20;
 const MAX_AMOUNT = 200000;
 
+type PayMethod = "upi" | "razorpay";
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+  }
+}
+
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 function AddFundsPage() {
+  const [method, setMethod] = useState<PayMethod>("upi");
   const [amount, setAmount] = useState("");
   const [agreed, setAgreed] = useState(true);
   const [utrNumber, setUtrNumber] = useState("");
@@ -53,6 +81,8 @@ function AddFundsPage() {
   const queryClient = useQueryClient();
 
   const submitStaticPayment = useServerFn(submitStaticUpiPayment);
+  const startRazorpay = useServerFn(startRazorpayCheckout);
+  const confirmRazorpay = useServerFn(confirmRazorpayPayment);
   const getQrCode = useServerFn(fetchStaticQrCode);
 
   // Load static QR code server-side details on mount
@@ -76,6 +106,54 @@ function AddFundsPage() {
 
   const amountReady = !amountError && amt >= MIN_AMOUNT;
   const canSubmit = amountReady && agreed && utrNumber.trim().length >= 10 && !isSubmitting;
+
+  const handleRazorpay = async () => {
+    if (!amountReady || !agreed || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const ok = await loadRazorpayScript();
+      if (!ok || !window.Razorpay) throw new Error("Could not load the payment window. Check your connection.");
+
+      const session = await startRazorpay({ data: { amount: amt } });
+
+      const rzp = new window.Razorpay({
+        key: session.keyId,
+        amount: Math.round(session.amount * 100),
+        currency: "INR",
+        name: "Intopsmm",
+        description: `Wallet top-up of Rs ${session.amount}`,
+        order_id: session.razorpayOrderId,
+        theme: { color: "#10b981" },
+        handler: async (response: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) => {
+          try {
+            await confirmRazorpay({
+              data: {
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+              },
+            });
+            toast.success("Payment successful! Wallet credited.");
+            setAmount("");
+            await queryClient.invalidateQueries({ queryKey: ["my-topups"] });
+            void refreshProfile();
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Payment verification failed.");
+          }
+        },
+        modal: { ondismiss: () => setIsSubmitting(false) },
+      });
+      rzp.open();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not start the payment.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,9 +200,114 @@ function AddFundsPage() {
         </div>
       </Card>
 
+      {/* Payment method switcher */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => setMethod("upi")}
+          aria-pressed={method === "upi"}
+          className={`flex items-center gap-3 rounded-xl border p-4 text-left transition-all ${
+            method === "upi"
+              ? "border-emerald-500 bg-emerald-500/10"
+              : "border-border/60 bg-secondary/40 hover:border-emerald-500/50"
+          }`}
+        >
+          <QrCode className="h-5 w-5 shrink-0 text-emerald-400" />
+          <span className="min-w-0">
+            <span className="block text-sm font-bold">UPI QR + UTR</span>
+            <span className="block text-xs text-muted-foreground">Pay by PhonePe QR, admin verifies</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMethod("razorpay")}
+          aria-pressed={method === "razorpay"}
+          className={`flex items-center gap-3 rounded-xl border p-4 text-left transition-all ${
+            method === "razorpay"
+              ? "border-emerald-500 bg-emerald-500/10"
+              : "border-border/60 bg-secondary/40 hover:border-emerald-500/50"
+          }`}
+        >
+          <CreditCard className="h-5 w-5 shrink-0 text-emerald-400" />
+          <span className="min-w-0">
+            <span className="block text-sm font-bold">Razorpay (Instant)</span>
+            <span className="block text-xs text-muted-foreground">UPI, cards, netbanking — auto credit</span>
+          </span>
+        </button>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Left Column: QR Code & Form */}
         <div className="space-y-6 lg:col-span-7">
+          {method === "razorpay" ? (
+            <Card className="glass border-border/60 p-6 shadow-card space-y-5">
+              <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+                <Zap className="h-5 w-5 text-emerald-400" /> Instant payment with Razorpay
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Pay with any UPI app, debit/credit card or netbanking. Your wallet is credited automatically
+                right after a successful payment — no UTR needed.
+              </p>
+
+              <div className="space-y-2">
+                <Label htmlFor="rzp-amount" className="text-sm font-semibold">
+                  Amount (Minimum ₹{MIN_AMOUNT})
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground">
+                    ₹
+                  </span>
+                  <Input
+                    id="rzp-amount"
+                    inputMode="decimal"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                    placeholder="Enter amount"
+                    className="h-12 rounded-xl border-border/60 bg-background pl-9 text-lg font-bold tracking-wide"
+                  />
+                </div>
+                {amountError && <p className="text-xs font-medium text-destructive">{amountError}</p>}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {QUICK_AMOUNTS.map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setAmount(String(val))}
+                    className={`rounded-xl border px-4 py-2 text-xs font-bold transition-all ${
+                      amt === val
+                        ? "border-emerald-500 bg-emerald-500/15 text-emerald-400 shadow-sm"
+                        : "border-border/60 bg-secondary/40 text-muted-foreground hover:border-emerald-500/50 hover:text-foreground"
+                    }`}
+                  >
+                    ₹{fmt.format(val)}
+                  </button>
+                ))}
+              </div>
+
+              <label className="flex cursor-pointer items-start gap-2.5 text-xs text-muted-foreground">
+                <Checkbox checked={agreed} onCheckedChange={(v) => setAgreed(v === true)} className="mt-0.5" />
+                <span>
+                  I agree that funds added will be used for SMM services and I will not raise fraudulent disputes.
+                </span>
+              </label>
+
+              <Button
+                type="button"
+                variant="hero"
+                onClick={handleRazorpay}
+                disabled={!amountReady || !agreed || isSubmitting}
+                className="h-12 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-sm font-bold shadow-lg shadow-emerald-500/20 hover:from-emerald-600 hover:to-teal-700"
+              >
+                {isSubmitting ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening…</>
+                ) : (
+                  <><CreditCard className="mr-2 h-4 w-4" /> Pay ₹{amt > 0 ? fmt.format(amt) : "0"} securely</>
+                )}
+              </Button>
+            </Card>
+          ) : (
           <Card className="glass border-border/60 p-6 shadow-card space-y-6">
             <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
               <QrCode className="h-5 w-5 text-emerald-400" /> Pay using UPI QR Code
@@ -230,6 +413,7 @@ function AddFundsPage() {
               </Button>
             </form>
           </Card>
+          )}
         </div>
 
         {/* Right Column: Instructions Card */}

@@ -265,7 +265,8 @@ export async function getStaticQrInfo() {
   };
 }
 
-/** Webhook handler stub */
-export async function handleRazorpayWebhook(_rawBody: string, _signature: string | null) {
-  return new Response("ok");
+/** Razorpay webhook entrypoint. */
+export async function handleRazorpayWebhook(rawBody: string, signature: string | null) {
+  const { handleRazorpayWebhookEvent } = await import("./razorpay.server");
+  return handleRazorpayWebhookEvent(rawBody, signature);
 }

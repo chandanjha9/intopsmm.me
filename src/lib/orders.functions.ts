@@ -47,6 +47,15 @@ export const listServices = createServerFn({ method: "GET" })
     }));
   });
 
+/** Platform-wide completed order counter (base offset + live rows). */
+export const getTotalOrderCount = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .handler(async () => {
+    const db = await poolConnect;
+    const result = await db.request().query(`SELECT COUNT_BIG(*) AS total FROM orders`);
+    return { total: 230826 + Number(result.recordset[0]?.total ?? 0) };
+  });
+
 export const listMyOrders = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async ({ context }) => {

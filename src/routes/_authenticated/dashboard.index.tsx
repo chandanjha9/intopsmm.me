@@ -25,7 +25,7 @@ import {
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuth } from "@/hooks/use-auth";
 import { formatInr } from "@/lib/providers/pricing";
-import { listMyOrders, listServices, placeOrder } from "@/lib/orders.functions";
+import { getTotalOrderCount, listMyOrders, listServices, placeOrder } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/_authenticated/dashboard/")({
   head: () => ({
@@ -169,6 +169,7 @@ function DashboardPage() {
   const fetchServices = useServerFn(listServices);
   const fetchOrders = useServerFn(listMyOrders);
   const submitOrder = useServerFn(placeOrder);
+  const fetchTotalOrders = useServerFn(getTotalOrderCount);
 
   const { data: allServices = [], isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
@@ -181,6 +182,18 @@ function DashboardPage() {
       }
     },
     staleTime: 60_000,
+  });
+  const { data: totalOrders } = useQuery({
+    queryKey: ["total-orders"],
+    queryFn: async () => {
+      try {
+        const res = await fetchTotalOrders();
+        return Number((res as { total?: number } | null)?.total ?? 0);
+      } catch {
+        return 0;
+      }
+    },
+    refetchInterval: 15_000,
   });
   const { data: myOrders = [] } = useQuery({
     queryKey: ["my-orders"],
@@ -276,7 +289,7 @@ function DashboardPage() {
       value: "93%",
       Icon: BadgeCheck,
     },
-    { label: "Total Orders", value: (230826 + myOrders.length).toLocaleString("en-IN"), Icon: ShoppingCart },
+    { label: "Total Orders", value: (totalOrders && totalOrders > 0 ? totalOrders : 230826 + myOrders.length).toLocaleString("en-IN"), Icon: ShoppingCart },
     {
       label: "Spent Balance",
       value: formatInr(netSpent),
@@ -301,6 +314,7 @@ function DashboardPage() {
       setLink("");
       void refreshProfile();
       void queryClient.invalidateQueries({ queryKey: ["my-orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["total-orders"] });
       void queryClient.invalidateQueries({ queryKey: ["my-transactions"] });
     },
     onError: (error: Error) => toast.error("Order failed", { description: error.message }),
