@@ -316,14 +316,15 @@ function RegisterPage() {
               />
               <span className="text-muted-foreground">
                 I agree to the{" "}
-                <a href="#" className="font-medium text-primary hover:underline">
+                <Link to="/terms" className="font-medium text-primary hover:underline">
                   Terms
-                </a>{" "}
+                </Link>{" "}
                 and{" "}
-                <a href="#" className="font-medium text-primary hover:underline">
+                <Link to="/terms" className="font-medium text-primary hover:underline">
                   Privacy Policy
-                </a>
+                </Link>
                 .
+
               </span>
             </label>
 

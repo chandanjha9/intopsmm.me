@@ -1210,7 +1210,7 @@ export function Footer() {
               { I: Instagram, label: "Instagram", href: "https://instagram.com/intopsmm.me" },
               { I: Twitter, label: "Twitter", href: "#" },
               { I: Facebook, label: "Facebook", href: "#" },
-              { I: Youtube, label: "YouTube", href: "#" },
+              { I: Youtube, label: "YouTube", href: "https://www.youtube.com/channel/UCMcQJiSFGJ-YiE3OyA3FpiA" },
             ].map(({ I, label, href }) => (
               <a
                 key={label}

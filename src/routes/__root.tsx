@@ -82,13 +82,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Intopsmm — SMM Panel for Social Media Growth" },
-      {
-        name: "description",
-        content:
-          "Intopsmm is a fast, secure and automated SMM panel offering followers, likes, views and engagement services for every major social platform.",
-      },
       { name: "author", content: "Intopsmm" },
+
       { property: "og:title", content: "Intopsmm — #1 SMM Panel for Instant Growth" },
       {
         property: "og:description",
@@ -108,14 +103,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
             {
               "@type": "WebSite",
               name: "Intopsmm",
-              url: "https://intopsmm-me.onrender.com",
+              url: "https://growmesmm.lovable.app",
               description:
                 "Fast, secure and automated SMM panel services for creators, agencies and resellers.",
             },
             {
               "@type": "Organization",
               name: "Intopsmm",
-              url: "https://intopsmm-me.onrender.com",
+              url: "https://growmesmm.lovable.app",
               description:
                 "Intopsmm provides social media marketing services including followers, likes, views and engagement across all major platforms.",
             },

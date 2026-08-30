@@ -9,4 +9,5 @@ export const SITE_CONTACT = {
   whatsappNumber: "+91 94724 84052",
   whatsappLink: "https://wa.me/919472484052",
   instagram: "https://instagram.com/intopsmm.me",
+  youtube: "https://www.youtube.com/channel/UCMcQJiSFGJ-YiE3OyA3FpiA",
 } as const;

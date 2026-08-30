@@ -30,11 +30,9 @@ import { Route as AuthenticatedAdminServicesRouteImport } from './routes/_authen
 import { Route as AuthenticatedAdminProvidersRouteImport } from './routes/_authenticated/admin.providers'
 import { Route as AuthenticatedAdminOrdersRouteImport } from './routes/_authenticated/admin.orders'
 import { Route as AuthenticatedAdminLogsRouteImport } from './routes/_authenticated/admin.logs'
-import { Route as ApiPublicPayRazorpayReturnRouteImport } from './routes/api/public/pay/razorpay-return'
 import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
 import { Route as ApiPublicHooksStatusSyncRouteImport } from './routes/api/public/hooks/status-sync'
 import { Route as ApiPublicHooksRetryFailedOrdersRouteImport } from './routes/api/public/hooks/retry-failed-orders'
-import { Route as ApiPublicHooksRazorpayRouteImport } from './routes/api/public/hooks/razorpay'
 import { Route as ApiPublicHooksImportServicesRouteImport } from './routes/api/public/hooks/import-services'
 import { Route as ApiPublicHooksCleanLogsRouteImport } from './routes/api/public/hooks/clean-logs'
 import { Route as ApiPublicHooksBalanceSyncRouteImport } from './routes/api/public/hooks/balance-sync'
@@ -151,12 +149,6 @@ const AuthenticatedAdminLogsRoute = AuthenticatedAdminLogsRouteImport.update({
   path: '/logs',
   getParentRoute: () => AuthenticatedAdminRouteRoute,
 } as any)
-const ApiPublicPayRazorpayReturnRoute =
-  ApiPublicPayRazorpayReturnRouteImport.update({
-    id: '/api/public/pay/razorpay-return',
-    path: '/api/public/pay/razorpay-return',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicHooksTelegramRoute = ApiPublicHooksTelegramRouteImport.update({
   id: '/api/public/hooks/telegram',
   path: '/api/public/hooks/telegram',
@@ -174,11 +166,6 @@ const ApiPublicHooksRetryFailedOrdersRoute =
     path: '/api/public/hooks/retry-failed-orders',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHooksRazorpayRoute = ApiPublicHooksRazorpayRouteImport.update({
-  id: '/api/public/hooks/razorpay',
-  path: '/api/public/hooks/razorpay',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicHooksImportServicesRoute =
   ApiPublicHooksImportServicesRouteImport.update({
     id: '/api/public/hooks/import-services',
@@ -221,11 +208,9 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/balance-sync': typeof ApiPublicHooksBalanceSyncRoute
   '/api/public/hooks/clean-logs': typeof ApiPublicHooksCleanLogsRoute
   '/api/public/hooks/import-services': typeof ApiPublicHooksImportServicesRoute
-  '/api/public/hooks/razorpay': typeof ApiPublicHooksRazorpayRoute
   '/api/public/hooks/retry-failed-orders': typeof ApiPublicHooksRetryFailedOrdersRoute
   '/api/public/hooks/status-sync': typeof ApiPublicHooksStatusSyncRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
-  '/api/public/pay/razorpay-return': typeof ApiPublicPayRazorpayReturnRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -250,11 +235,9 @@ export interface FileRoutesByTo {
   '/api/public/hooks/balance-sync': typeof ApiPublicHooksBalanceSyncRoute
   '/api/public/hooks/clean-logs': typeof ApiPublicHooksCleanLogsRoute
   '/api/public/hooks/import-services': typeof ApiPublicHooksImportServicesRoute
-  '/api/public/hooks/razorpay': typeof ApiPublicHooksRazorpayRoute
   '/api/public/hooks/retry-failed-orders': typeof ApiPublicHooksRetryFailedOrdersRoute
   '/api/public/hooks/status-sync': typeof ApiPublicHooksStatusSyncRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
-  '/api/public/pay/razorpay-return': typeof ApiPublicPayRazorpayReturnRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -282,11 +265,9 @@ export interface FileRoutesById {
   '/api/public/hooks/balance-sync': typeof ApiPublicHooksBalanceSyncRoute
   '/api/public/hooks/clean-logs': typeof ApiPublicHooksCleanLogsRoute
   '/api/public/hooks/import-services': typeof ApiPublicHooksImportServicesRoute
-  '/api/public/hooks/razorpay': typeof ApiPublicHooksRazorpayRoute
   '/api/public/hooks/retry-failed-orders': typeof ApiPublicHooksRetryFailedOrdersRoute
   '/api/public/hooks/status-sync': typeof ApiPublicHooksStatusSyncRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
-  '/api/public/pay/razorpay-return': typeof ApiPublicPayRazorpayReturnRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -314,11 +295,9 @@ export interface FileRouteTypes {
     | '/api/public/hooks/balance-sync'
     | '/api/public/hooks/clean-logs'
     | '/api/public/hooks/import-services'
-    | '/api/public/hooks/razorpay'
     | '/api/public/hooks/retry-failed-orders'
     | '/api/public/hooks/status-sync'
     | '/api/public/hooks/telegram'
-    | '/api/public/pay/razorpay-return'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -343,11 +322,9 @@ export interface FileRouteTypes {
     | '/api/public/hooks/balance-sync'
     | '/api/public/hooks/clean-logs'
     | '/api/public/hooks/import-services'
-    | '/api/public/hooks/razorpay'
     | '/api/public/hooks/retry-failed-orders'
     | '/api/public/hooks/status-sync'
     | '/api/public/hooks/telegram'
-    | '/api/public/pay/razorpay-return'
   id:
     | '__root__'
     | '/'
@@ -374,11 +351,9 @@ export interface FileRouteTypes {
     | '/api/public/hooks/balance-sync'
     | '/api/public/hooks/clean-logs'
     | '/api/public/hooks/import-services'
-    | '/api/public/hooks/razorpay'
     | '/api/public/hooks/retry-failed-orders'
     | '/api/public/hooks/status-sync'
     | '/api/public/hooks/telegram'
-    | '/api/public/pay/razorpay-return'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -395,11 +370,9 @@ export interface RootRouteChildren {
   ApiPublicHooksBalanceSyncRoute: typeof ApiPublicHooksBalanceSyncRoute
   ApiPublicHooksCleanLogsRoute: typeof ApiPublicHooksCleanLogsRoute
   ApiPublicHooksImportServicesRoute: typeof ApiPublicHooksImportServicesRoute
-  ApiPublicHooksRazorpayRoute: typeof ApiPublicHooksRazorpayRoute
   ApiPublicHooksRetryFailedOrdersRoute: typeof ApiPublicHooksRetryFailedOrdersRoute
   ApiPublicHooksStatusSyncRoute: typeof ApiPublicHooksStatusSyncRoute
   ApiPublicHooksTelegramRoute: typeof ApiPublicHooksTelegramRoute
-  ApiPublicPayRazorpayReturnRoute: typeof ApiPublicPayRazorpayReturnRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -551,13 +524,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminLogsRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
-    '/api/public/pay/razorpay-return': {
-      id: '/api/public/pay/razorpay-return'
-      path: '/api/public/pay/razorpay-return'
-      fullPath: '/api/public/pay/razorpay-return'
-      preLoaderRoute: typeof ApiPublicPayRazorpayReturnRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/hooks/telegram': {
       id: '/api/public/hooks/telegram'
       path: '/api/public/hooks/telegram'
@@ -577,13 +543,6 @@ declare module '@tanstack/react-router' {
       path: '/api/public/hooks/retry-failed-orders'
       fullPath: '/api/public/hooks/retry-failed-orders'
       preLoaderRoute: typeof ApiPublicHooksRetryFailedOrdersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/razorpay': {
-      id: '/api/public/hooks/razorpay'
-      path: '/api/public/hooks/razorpay'
-      fullPath: '/api/public/hooks/razorpay'
-      preLoaderRoute: typeof ApiPublicHooksRazorpayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/import-services': {
@@ -669,11 +628,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksBalanceSyncRoute: ApiPublicHooksBalanceSyncRoute,
   ApiPublicHooksCleanLogsRoute: ApiPublicHooksCleanLogsRoute,
   ApiPublicHooksImportServicesRoute: ApiPublicHooksImportServicesRoute,
-  ApiPublicHooksRazorpayRoute: ApiPublicHooksRazorpayRoute,
   ApiPublicHooksRetryFailedOrdersRoute: ApiPublicHooksRetryFailedOrdersRoute,
   ApiPublicHooksStatusSyncRoute: ApiPublicHooksStatusSyncRoute,
   ApiPublicHooksTelegramRoute: ApiPublicHooksTelegramRoute,
-  ApiPublicPayRazorpayReturnRoute: ApiPublicPayRazorpayReturnRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

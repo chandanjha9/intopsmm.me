@@ -264,9 +264,3 @@ export async function getStaticQrInfo() {
     qrDataUrl,
   };
 }
-
-/** Razorpay webhook entrypoint. */
-export async function handleRazorpayWebhook(rawBody: string, signature: string | null) {
-  const { handleRazorpayWebhookEvent } = await import("./razorpay.server");
-  return handleRazorpayWebhookEvent(rawBody, signature);
-}

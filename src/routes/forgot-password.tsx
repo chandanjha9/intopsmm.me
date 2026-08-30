@@ -16,7 +16,16 @@ export const Route = createFileRoute("/forgot-password")({
       { title: "Forgot password — Intopsmm" },
       { name: "description", content: "Reset your Intopsmm account password via email." },
       { property: "og:title", content: "Forgot password — Intopsmm" },
+      {
+        property: "og:description",
+        content:
+          "Request a secure password reset link for your Intopsmm SMM panel account and get back to your orders in minutes.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "robots", content: "noindex" },
     ],
+
   }),
   component: ForgotPasswordPage,
 });

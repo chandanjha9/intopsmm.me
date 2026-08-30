@@ -3,7 +3,7 @@ import { z } from "zod";
 import sql from "mssql";
 import { poolConnect } from "@/integrations/sqlServer/client";
 import { requireAuth } from "./auth/auth-middleware";
-import { createRazorpayOrder, verifyRazorpayPayment } from "./razorpay.server";
+
 import { createTopupSession, getTopupStatus, submitUtrForVerification, submitStaticUtrVerification, getStaticQrInfo } from "./payments.server";
 
 const amountSchema = z.object({
@@ -85,19 +85,3 @@ export const listMyTopups = createServerFn({ method: "GET" })
 export const fetchStaticQrCode = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async () => getStaticQrInfo());
-
-const razorpayVerifySchema = z.object({
-  razorpayOrderId: z.string().min(4).max(80),
-  razorpayPaymentId: z.string().min(4).max(80),
-  razorpaySignature: z.string().min(10).max(200),
-});
-
-export const startRazorpayCheckout = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
-  .inputValidator((input: unknown) => amountSchema.parse(input))
-  .handler(async ({ data, context }) => createRazorpayOrder(context.userId, data.amount));
-
-export const confirmRazorpayPayment = createServerFn({ method: "POST" })
-  .middleware([requireAuth])
-  .inputValidator((input: unknown) => razorpayVerifySchema.parse(input))
-  .handler(async ({ data, context }) => verifyRazorpayPayment(context.userId, data));
