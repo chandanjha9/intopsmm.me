@@ -5,19 +5,18 @@
 
 export const SITE_CONFIG = {
   brand: "Intopsmm",
-  legalName: "Intopsmm Technologies",
   siteUrl: process.env.SITE_URL || "https://intopsmm.me",
   email: "intopsmm.me@gmail.com",
   supportPhone: "+91 94724 84052",
   whatsappLink: "https://wa.me/919472484052",
-  tagline: "Cheapest & Fastest SMM Panel Services",
+  tagline: "Affordable & Reliable SMM Panel Services",
   defaultDescription:
-    "Intopsmm is India's #1 fastest & cheapest SMM panel for creators, agencies, and resellers. Boost followers, views, likes, and watch time across Instagram, YouTube, Telegram & TikTok with instant automated delivery.",
+    "Intopsmm is an automated SMM panel for creators, agencies, and resellers in India. Boost followers, views, likes, and watch time across Instagram, YouTube, Telegram & TikTok with instant automated delivery and 24/7 support.",
   social: {
     instagram: "https://instagram.com/intopsmm.me",
     youtube: "https://www.youtube.com/channel/UCMcQJiSFGJ-YiE3OyA3FpiA",
   },
-  defaultOgImage: "/favicon.png",
+  defaultOgImage: "/og-image.jpg",
   locale: "en_IN",
 } as const;
 

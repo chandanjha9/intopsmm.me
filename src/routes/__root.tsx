@@ -84,10 +84,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Intopsmm — Cheapest & Fastest SMM Panel Services" },
+      { title: "Intopsmm — Affordable & Reliable SMM Panel Services" },
       { name: "author", content: "Intopsmm" },
 
-      { property: "og:title", content: "Intopsmm — #1 SMM Panel for Instant Growth" },
+      { property: "og:title", content: "Intopsmm — SMM Panel for Social Media Growth" },
       {
         property: "og:description",
         content:
@@ -117,6 +117,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.png", type: "image/png" },
+      { rel: "preload", as: "image", href: "/og-image.jpg" },
       { rel: "apple-touch-icon", href: "/favicon.png" },
       { rel: "manifest", href: "/manifest.webmanifest" },
     ],
@@ -131,7 +132,6 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
-        <title>Intopsmm — Cheapest & Fastest SMM Panel Services</title>
         <HeadContent />
       </head>
       <body>

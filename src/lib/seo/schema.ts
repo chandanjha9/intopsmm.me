@@ -8,7 +8,6 @@ export function getOrganizationSchema() {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: SITE_CONFIG.brand,
-    legalName: SITE_CONFIG.legalName,
     url: SITE_CONFIG.siteUrl,
     logo: absoluteUrl("/favicon.png"),
     contactPoint: {
@@ -145,7 +144,7 @@ export function getArticleSchema({
     headline: title,
     description,
     url: absoluteUrl(path),
-    image: coverImage ? absoluteUrl(coverImage) : absoluteUrl("/favicon.png"),
+    image: coverImage ? absoluteUrl(coverImage) : absoluteUrl("/og-image.jpg"),
     author: {
       "@type": "Person",
       name: author,

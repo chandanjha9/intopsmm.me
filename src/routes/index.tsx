@@ -61,14 +61,14 @@ export const Route = createFileRoute("/")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Intopsmm — Cheapest & Fastest SMM Panel Services" },
+      { title: "Intopsmm — Affordable & Reliable SMM Panel Services" },
       {
         name: "description",
         content:
-          "Intopsmm is India's #1 fast, secure and automated SMM panel. 1600+ services, instant delivery, secure INR UPI payments and 24/7 expert support.",
+          "Intopsmm is an automated SMM panel for creators, agencies and resellers in India. 1600+ services, instant delivery, secure INR UPI payments and 24/7 expert support.",
       },
       { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" },
-      { property: "og:title", content: "Intopsmm — Cheapest & Fastest SMM Panel Services" },
+      { property: "og:title", content: "Intopsmm — SMM Panel for Social Media Growth" },
       {
         property: "og:description",
         content:
@@ -76,11 +76,11 @@ export const Route = createFileRoute("/")({
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: `${SITE_CONFIG.siteUrl}/` },
-      { property: "og:image", content: `${SITE_CONFIG.siteUrl}/favicon.png` },
+      { property: "og:image", content: `${SITE_CONFIG.siteUrl}/og-image.jpg` },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Intopsmm — Cheapest & Fastest SMM Panel Services" },
+      { name: "twitter:title", content: "Intopsmm — Affordable SMM Panel for Social Media Growth" },
       { name: "twitter:description", content: "1600+ high-quality SMM services with instant delivery in INR." },
-      { name: "twitter:image", content: `${SITE_CONFIG.siteUrl}/favicon.png` },
+      { name: "twitter:image", content: `${SITE_CONFIG.siteUrl}/og-image.jpg` },
     ],
     links: [{ rel: "canonical", href: `${SITE_CONFIG.siteUrl}/` }],
     scripts: [

@@ -41,7 +41,7 @@ const PLATFORMS_DATA: Record<string, PlatformDetails> = {
     metaDescription:
       "Scale your Instagram with instant delivery followers, real likes, high-retention video views, and reels engagement at unbeatable INR prices with refill guarantee.",
     intro:
-      "Boost your Instagram profile with India's #1 automated SMM panel. We offer instant delivery followers, active post likes, reels views, story views, and impressions designed to elevate your algorithmic reach without password requirements.",
+      "Boost your Instagram profile with Intopsmm's automated SMM panel. We offer instant delivery followers, active post likes, reels views, story views, and impressions designed to elevate your algorithmic reach without password requirements.",
     features: [
       "Instant 0-5 Minute Order Processing",
       "High-Retention & Non-Drop Followers Available",

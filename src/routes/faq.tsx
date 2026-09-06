@@ -63,7 +63,7 @@ export const Route = createFileRoute("/faq")({
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: `${SITE_CONFIG.siteUrl}/faq` },
-      { property: "og:image", content: `${SITE_CONFIG.siteUrl}/favicon.png` },
+      { property: "og:image", content: `${SITE_CONFIG.siteUrl}/og-image.jpg` },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [{ rel: "canonical", href: `${SITE_CONFIG.siteUrl}/faq` }],

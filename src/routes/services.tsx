@@ -28,11 +28,11 @@ export const Route = createFileRoute("/services")({
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: `${SITE_CONFIG.siteUrl}/services` },
-      { property: "og:image", content: `${SITE_CONFIG.siteUrl}/favicon.png` },
+      { property: "og:image", content: `${SITE_CONFIG.siteUrl}/og-image.jpg` },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Our Services & Price List — Intopsmm SMM Panel" },
       { name: "twitter:description", content: "Live Intopsmm SMM services with prices in INR." },
-      { name: "twitter:image", content: `${SITE_CONFIG.siteUrl}/favicon.png` },
+      { name: "twitter:image", content: `${SITE_CONFIG.siteUrl}/og-image.jpg` },
     ],
     links: [{ rel: "canonical", href: `${SITE_CONFIG.siteUrl}/services` }],
     scripts: [
