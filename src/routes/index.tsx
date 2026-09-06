@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { AppSplashScreen } from "@/components/AppSplashScreen";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -106,8 +107,12 @@ function Landing() {
     }
   }, [loading, session, navigate]);
 
+  if (loading || session) {
+    return <AppSplashScreen message={session ? "Opening your dashboard…" : "Connecting to Intopsmm…"} />;
+  }
+
   return (
-    <div className="min-h-screen bg-page-tint text-foreground">
+    <div className="min-h-screen bg-page-tint text-foreground animate-in fade-in duration-300">
       <Nav />
       <PromoPopup />
       <PromoSticker />

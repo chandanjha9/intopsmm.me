@@ -59,13 +59,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (res?.profile) {
         setProfile(res.profile);
         setUser(profileToAuthUser(res.profile));
+        try { localStorage.setItem("intopsmm_has_session", "true"); } catch {}
       } else {
         setUser(null);
         setProfile(null);
+        try { localStorage.removeItem("intopsmm_has_session"); } catch {}
       }
     } catch {
       setUser(null);
       setProfile(null);
+      try { localStorage.removeItem("intopsmm_has_session"); } catch {}
     } finally {
       setLoading(false);
     }
@@ -80,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (result?.profile) {
       setProfile(result.profile);
       setUser(profileToAuthUser(result.profile));
+      try { localStorage.setItem("intopsmm_has_session", "true"); } catch {}
     }
   };
 
@@ -88,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (result?.profile) {
       setProfile(result.profile);
       setUser(profileToAuthUser(result.profile));
+      try { localStorage.setItem("intopsmm_has_session", "true"); } catch {}
     }
   };
 
@@ -106,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (result?.profile) {
       setProfile(result.profile);
       setUser(profileToAuthUser(result.profile));
+      try { localStorage.setItem("intopsmm_has_session", "true"); } catch {}
     }
   };
 
@@ -115,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setProfile(null);
+      try { localStorage.removeItem("intopsmm_has_session"); } catch {}
     }
   };
 
