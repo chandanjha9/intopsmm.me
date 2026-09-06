@@ -3,15 +3,18 @@ import sql from "mssql";
 
 dotenv.config();
 
-const host = process.env.SQLSERVER_HOST || "";
-const database = process.env.SQLSERVER_DATABASE || "growmesmm";
+const host = process.env.SQLSERVER_HOST || "180.151.91.194";
+const port = Number(process.env.SQLSERVER_PORT) || 50210;
+const user = process.env.SQLSERVER_USER || "wspl";
+const password = process.env.SQLSERVER_PASSWORD || "TE-B}x]u";
+const database = process.env.SQLSERVER_DATABASE || "WaydineQA";
 
 // Configure connection pool
 export const pool = new sql.ConnectionPool({
-  server: host || "localhost",
-  port: Number(process.env.SQLSERVER_PORT) || 1433,
-  user: process.env.SQLSERVER_USER || "",
-  password: process.env.SQLSERVER_PASSWORD || "",
+  server: host,
+  port,
+  user,
+  password,
   database,
   options: {
     encrypt: process.env.SQLSERVER_ENCRYPT === "true",
@@ -26,6 +29,10 @@ export const pool = new sql.ConnectionPool({
 
 export const poolConnect: Promise<sql.ConnectionPool> = pool
   .connect()
+  .then((p) => {
+    console.log(`✅ SQL Server Connected successfully to [${host}:${port}/${database}]`);
+    return p;
+  })
   .catch((err) => {
     console.error("SQL Server Connection Failed:", err.message);
     return pool;

@@ -106,32 +106,12 @@ function Landing() {
     }
   }, [loading, session, navigate]);
 
-  // While the session is being verified (or when already logged in), never flash
-  // the landing page — show a lightweight splash until the redirect happens.
-  if (loading || session) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-page-tint">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Loading your dashboard…</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-
     <div className="min-h-screen bg-page-tint text-foreground">
       <Nav />
       <PromoPopup />
       <PromoSticker />
       <Hero />
-      <TagStrip />
-      <WhyChoose />
-      <InsightCards />
-      <NumbersCard />
-      <VsOthers />
-      <Clientele />
       <Steps />
       <Testimonials />
       <FeatureSplits />
@@ -416,7 +396,7 @@ function HeroLoginCard() {
   };
 
   return (
-    <Card className="w-full max-w-[400px] rounded-xl border-border/60 bg-card p-6 shadow-card">
+    <Card className="w-full max-w-[480px] rounded-xl border-border/60 bg-card p-8 shadow-card">
       <h2 className="text-base font-bold tracking-tight">Welcome back</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         No account?{" "}
@@ -495,7 +475,7 @@ function Hero() {
         <div className="absolute -left-32 top-0 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
         <div className="absolute right-0 top-20 h-[28rem] w-[28rem] rounded-full bg-white/10 blur-3xl" />
       </div>
-      <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="text-center lg:text-left">
           <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-1.5 text-xs font-bold text-foreground shadow-glow">
             <Globe2 className="h-3.5 w-3.5 text-primary" /> India Best SMM Panel
@@ -517,7 +497,7 @@ function Hero() {
             </Button>
           </div>
         </div>
-        <div className="flex justify-center lg:justify-end">
+        <div className="flex justify-center lg:justify-center">
           <HeroLoginCard />
         </div>
       </div>

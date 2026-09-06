@@ -82,6 +82,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { title: "Intopsmm — Cheapest & Fastest SMM Panel Services" },
       { name: "author", content: "Intopsmm" },
 
       { property: "og:title", content: "Intopsmm — #1 SMM Panel for Instant Growth" },
@@ -137,6 +138,7 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
+        <title>Intopsmm — Cheapest & Fastest SMM Panel Services</title>
         <HeadContent />
       </head>
       <body>

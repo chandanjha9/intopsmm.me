@@ -17,6 +17,8 @@ import {
   History,
   ArrowLeftRight,
   RefreshCcw,
+  ListChecks,
+  BellRing,
   ShieldCheck,
   ShoppingBag,
   LogOut,
@@ -30,6 +32,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import { isCurrentUserAdmin } from "@/lib/providers/admin.functions";
 import { Logo } from "@/components/ui/Logo";
+import { PopupAlertModal } from "./PopupAlertModal";
 
 const navItems = [
   { icon: Plus, label: "New Order", to: "/dashboard" as const, emoji: "🛒" },
@@ -37,6 +40,8 @@ const navItems = [
   { icon: History, label: "Order History", to: "/dashboard/order-history" as const, emoji: "📋" },
   { icon: ArrowLeftRight, label: "Transactions", to: "/dashboard/transactions" as const, emoji: "💸" },
   { icon: RefreshCcw, label: "Refill", to: "/dashboard/refill" as const, emoji: "🔄" },
+  { icon: ListChecks, label: "Services", to: "/dashboard/services" as const, emoji: "⚡" },
+  { icon: BellRing, label: "Daily Updates", to: "/dashboard/updates" as const, emoji: "📢" },
 ];
 
 // Bottom tab bar items (most used on mobile)
@@ -84,7 +89,7 @@ export function DashboardShell({ active, children }: { active: string; children:
       queryClient.clear();
       await logout();
       setShowLogoutConfirm(false);
-      navigate({ to: "/login", replace: true });
+      navigate({ to: "/", replace: true });
     } finally {
       setIsLoggingOut(false);
     }
@@ -130,6 +135,7 @@ export function DashboardShell({ active, children }: { active: string; children:
                 [
                   { label: "Admin Overview", to: "/admin" as const, Icon: ShieldCheck },
                   { label: "Orders", to: "/admin/orders" as const, Icon: ShoppingBag },
+                  { label: "News & Alerts", to: "/admin/news" as const, Icon: BellRing },
                   { label: "Providers", to: "/admin/providers" as const, Icon: ShieldCheck },
                   { label: "Services", to: "/admin/services" as const, Icon: ShieldCheck },
                   { label: "API Logs", to: "/admin/logs" as const, Icon: ShieldCheck },
@@ -181,6 +187,9 @@ export function DashboardShell({ active, children }: { active: string; children:
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Global Interactive Popup Alert for users */}
+      <PopupAlertModal />
+
       <div className={`fixed top-0 inset-x-0 z-[100] h-1 bg-primary transition-opacity ${isNavigating ? "opacity-100" : "opacity-0"}`}></div>
       {/* Ambient background */}
       <div className="pointer-events-none fixed inset-0 -z-10 opacity-70">

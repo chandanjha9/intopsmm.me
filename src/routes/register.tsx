@@ -13,7 +13,7 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
-import { BrandingPane, GoogleMark } from "./login";
+import { BrandingPane, GoogleMark } from "@/components/auth/BrandingPane";
 import { useAuth } from "@/hooks/use-auth";
 import { checkAvailabilityServerFn } from "@/lib/auth/auth.functions";
 
@@ -369,7 +369,7 @@ function RegisterPage() {
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link to="/login" className="font-semibold text-primary hover:underline">
+            <Link to="/" className="font-semibold text-primary hover:underline">
               Log in
             </Link>
           </p>

@@ -6,6 +6,7 @@ import { requireAuth } from "@/lib/auth/auth-middleware";
 import { requireAdmin } from "@/lib/admin-guard.server";
 import { checkUserRole } from "@/lib/auth/service.server";
 import {
+  cleanDuplicateServices,
   fetchAdminOverview,
   fetchApiLogs,
   fetchInternalServices,
@@ -162,6 +163,13 @@ export const adminDeleteService = createServerFn({ method: "POST" })
     await requireAdmin(context.userId);
     await removeInternalService(data.id);
     return { deleted: true };
+  });
+
+export const adminCleanDuplicateServices = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context.userId);
+    return cleanDuplicateServices();
   });
 
 export const adminListLogs = createServerFn({ method: "GET" })

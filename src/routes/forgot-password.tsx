@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, Loader2, TrendingUp, ArrowRight, CheckCircle2 } from "lucide-react";
-import { BrandingPane } from "./login";
+import { BrandingPane } from "@/components/auth/BrandingPane";
 import { Logo } from "@/components/ui/Logo";
 import { forgotPasswordServerFn } from "@/lib/auth/auth.functions";
 
@@ -90,7 +90,7 @@ function ForgotPasswordPage() {
                 </button>
                 .
               </p>
-              <a href="/login" className="inline-block mt-4 text-sm font-semibold text-primary hover:underline">
+              <a href="/" className="inline-block mt-4 text-sm font-semibold text-primary hover:underline">
                 ← Back to login
               </a>
             </div>
@@ -144,7 +144,7 @@ function ForgotPasswordPage() {
 
               <p className="mt-6 text-center text-sm text-muted-foreground">
                 Remembered it?{" "}
-                <a href="/login" className="font-semibold text-primary hover:underline">
+                <a href="/" className="font-semibold text-primary hover:underline">
                   Back to login
                 </a>
               </p>

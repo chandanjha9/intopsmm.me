@@ -79,6 +79,7 @@ function AdminServicesPage() {
   const saveFn = useServerFn(adminSaveService);
   const deleteFn = useServerFn(adminDeleteService);
   const importFn = useServerFn(adminImportServices);
+  const cleanDupesFn = useServerFn(adminCleanDuplicateServices);
 
   const { data: catalog, isLoading: catalogLoading } = useQuery({
     queryKey: ["admin-catalog", search],
@@ -95,6 +96,17 @@ function AdminServicesPage() {
     void queryClient.invalidateQueries({ queryKey: ["admin-catalog"] });
     void queryClient.invalidateQueries({ queryKey: ["services"] });
   };
+
+  const cleanDupes = useMutation({
+    mutationFn: () => cleanDupesFn(),
+    onSuccess: (result) => {
+      toast.success("Deduplication complete", {
+        description: `${result.removed} duplicate services cleaned up.`,
+      });
+      invalidate();
+    },
+    onError: (error: Error) => toast.error("Deduplication failed", { description: error.message }),
+  });
 
   const importJob = useMutation({
     mutationFn: () => importFn({ data: {} }),
@@ -148,9 +160,19 @@ function AdminServicesPage() {
             Import supplier services, then publish them with your markup.
           </p>
         </div>
-        <Button className="ml-auto" disabled={importJob.isPending} onClick={() => importJob.mutate()}>
-          {importJob.isPending ? "Importing…" : "Import from provider"}
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={cleanDupes.isPending}
+            onClick={() => cleanDupes.mutate()}
+          >
+            {cleanDupes.isPending ? "Cleaning…" : "🧹 Clean Duplicates"}
+          </Button>
+          <Button disabled={importJob.isPending} onClick={() => importJob.mutate()}>
+            {importJob.isPending ? "Importing…" : "Import from provider"}
+          </Button>
+        </div>
       </div>
 
       {draft && (

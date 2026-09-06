@@ -261,6 +261,76 @@ export async function saveInternalService(input: {
     return { id: input.id, sellingRate };
   }
 
+  // Duplicate Check 1: Check if this provider service is already published
+  const existingProviderService = await db
+    .request()
+    .input("providerId", sql.UniqueIdentifier, input.providerId)
+    .input("providerServiceId", sql.NVarChar, input.providerServiceId)
+    .query(`SELECT TOP 1 id FROM services WHERE provider_id = @providerId AND provider_service_id = @providerServiceId`);
+
+  if (existingProviderService.recordset.length > 0) {
+    const existingId = String(existingProviderService.recordset[0].id);
+    await db
+      .request()
+      .input("id", sql.UniqueIdentifier, existingId)
+      .input("name", sql.NVarChar, input.name)
+      .input("category", sql.NVarChar, input.category)
+      .input("platform", sql.NVarChar, input.platform)
+      .input("description", sql.NVarChar, input.description ?? null)
+      .input("markupType", sql.NVarChar, input.markupType)
+      .input("markupValue", sql.Decimal(18, 4), input.markupValue)
+      .input("sellingRate", sql.Decimal(18, 4), sellingRate)
+      .input("minQuantity", sql.Int, source.min_quantity)
+      .input("maxQuantity", sql.Int, source.max_quantity)
+      .input("refillSupported", sql.Bit, source.refill_supported)
+      .input("cancelSupported", sql.Bit, source.cancel_supported)
+      .input("isActive", sql.Bit, input.isActive)
+      .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
+      .query(`
+        UPDATE services 
+        SET name = @name, category = @category, platform = @platform, description = @description, 
+            markup_type = @markupType, markup_value = @markupValue, selling_rate = @sellingRate, 
+            min_quantity = @minQuantity, max_quantity = @maxQuantity, 
+            refill_supported = @refillSupported, cancel_supported = @cancelSupported, 
+            is_active = @isActive, updated_at = @updatedAt
+        WHERE id = @id
+      `);
+    return { id: existingId, sellingRate };
+  }
+
+  // Duplicate Check 2: Check by exact Name + Category
+  const existingByName = await db
+    .request()
+    .input("name", sql.NVarChar, input.name.trim())
+    .input("category", sql.NVarChar, input.category.trim())
+    .query(`SELECT TOP 1 id FROM services WHERE LOWER(LTRIM(RTRIM(name))) = LOWER(@name) AND LOWER(LTRIM(RTRIM(category))) = LOWER(@category)`);
+
+  if (existingByName.recordset.length > 0) {
+    const existingId = String(existingByName.recordset[0].id);
+    await db
+      .request()
+      .input("id", sql.UniqueIdentifier, existingId)
+      .input("providerId", sql.UniqueIdentifier, input.providerId)
+      .input("providerServiceId", sql.NVarChar, input.providerServiceId)
+      .input("sellingRate", sql.Decimal(18, 4), sellingRate)
+      .input("minQuantity", sql.Int, source.min_quantity)
+      .input("maxQuantity", sql.Int, source.max_quantity)
+      .input("refillSupported", sql.Bit, source.refill_supported)
+      .input("cancelSupported", sql.Bit, source.cancel_supported)
+      .input("isActive", sql.Bit, input.isActive)
+      .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
+      .query(`
+        UPDATE services 
+        SET provider_id = @providerId, provider_service_id = @providerServiceId, 
+            selling_rate = @sellingRate, min_quantity = @minQuantity, max_quantity = @maxQuantity, 
+            refill_supported = @refillSupported, cancel_supported = @cancelSupported, 
+            is_active = @isActive, updated_at = @updatedAt
+        WHERE id = @id
+      `);
+    return { id: existingId, sellingRate };
+  }
+
+  // Insert Brand New Service
   const insertResult = await db
     .request()
     .input("providerId", sql.UniqueIdentifier, input.providerId)
@@ -291,7 +361,52 @@ export async function saveInternalService(input: {
       )
     `);
 
-  return { id: insertResult.recordset[0].id, sellingRate };
+  const newServiceId = String(insertResult.recordset[0].id);
+
+  // Automatically broadcast new service announcement to user feed
+  try {
+    await db
+      .request()
+      .input("title", sql.NVarChar(255), `✨ New Service Added: ${input.name}`)
+      .input(
+        "description",
+        sql.NVarChar(sql.MAX),
+        `New service "${input.name}" has been launched in ${input.category} starting at ₹${sellingRate.toFixed(2)} / 1000 with instant automated delivery.`
+      )
+      .input("category", sql.NVarChar(100), input.category)
+      .input("post_type", sql.NVarChar(50), "news")
+      .input("badge", sql.NVarChar(100), "✨ New Service")
+      .input("is_popup", sql.Bit, 0)
+      .input("is_active", sql.Bit, 1)
+      .query(`
+        INSERT INTO announcements (title, description, category, post_type, badge, is_popup, is_active)
+        VALUES (@title, @description, @category, @post_type, @badge, @is_popup, @is_active)
+      `);
+  } catch (err) {
+    console.error("Failed to auto-post new service announcement:", err);
+  }
+
+  return { id: newServiceId, sellingRate };
+}
+
+/** Clean up any duplicate services in the catalog by Name + Category */
+export async function cleanDuplicateServices(): Promise<{ removed: number }> {
+  const db = await poolConnect;
+  const result = await db.request().query(`
+    WITH CTE AS (
+      SELECT id,
+        ROW_NUMBER() OVER (
+          PARTITION BY LOWER(LTRIM(RTRIM(name))), LOWER(LTRIM(RTRIM(category)))
+          ORDER BY updated_at DESC, id ASC
+        ) as rn
+      FROM services
+    )
+    DELETE FROM services
+    WHERE id IN (SELECT id FROM CTE WHERE rn > 1);
+  `);
+
+  const removed = result.rowsAffected[0] || 0;
+  return { removed };
 }
 
 export async function removeInternalService(id: string): Promise<void> {

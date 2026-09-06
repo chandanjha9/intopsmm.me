@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 
 /**
@@ -13,7 +13,6 @@ export function RouteProgress() {
 
   const [visible, setVisible] = useState(false);
   const [progress, setProgress] = useState(0);
-  const titleRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isNavigating) {
@@ -23,16 +22,9 @@ export function RouteProgress() {
         setProgress((p) => (p >= 90 ? p : p + Math.max(1, (90 - p) * 0.15)));
       }, 120);
 
-      if (typeof document !== "undefined" && titleRef.current === null) {
-        titleRef.current = document.title;
-        document.title = "Loading…";
-      }
       return () => clearInterval(timer);
     }
 
-    if (typeof document !== "undefined" && titleRef.current !== null) {
-      titleRef.current = null;
-    }
     setProgress(100);
     const done = setTimeout(() => {
       setVisible(false);

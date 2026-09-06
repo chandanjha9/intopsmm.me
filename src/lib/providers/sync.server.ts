@@ -156,7 +156,7 @@ export async function resyncInternalPricing(providerId: string): Promise<number>
   const servicesRes = await db
     .request()
     .input("providerId", sql.UniqueIdentifier, providerId)
-    .query("SELECT id, provider_service_id, markup_type, markup_value FROM services WHERE provider_id = @providerId");
+    .query("SELECT id, name, category, provider_service_id, markup_type, markup_value, selling_rate FROM services WHERE provider_id = @providerId");
 
   const services = servicesRes.recordset;
   if (!services?.length) return 0;
@@ -179,6 +179,7 @@ export async function resyncInternalPricing(providerId: string): Promise<number>
     const source = service.provider_service_id ? byId.get(service.provider_service_id) : undefined;
     if (!source) continue;
 
+    const oldRate = Number(service.selling_rate);
     const sellingRate = calculateSellingRate(
       Number(source.rate),
       service.markup_type === "fixed" ? "fixed" : "percentage",
@@ -202,6 +203,35 @@ export async function resyncInternalPricing(providerId: string): Promise<number>
             is_active = @isActive, updated_at = @updatedAt
         WHERE id = @id
       `);
+
+    // Detect price drop & auto-post update to user feed
+    if (oldRate > 0 && sellingRate < oldRate) {
+      const dropDiff = oldRate - sellingRate;
+      if (dropDiff >= 0.01) {
+        const percentDrop = Math.round((dropDiff / oldRate) * 100);
+        try {
+          await db
+            .request()
+            .input("title", sql.NVarChar(255), `🔥 Price Dropped: ${service.name}`)
+            .input(
+              "description",
+              sql.NVarChar(sql.MAX),
+              `Great news! The rate for "${service.name}" has dropped from ₹${oldRate.toFixed(2)} to ₹${sellingRate.toFixed(2)} per 1000 (${percentDrop > 0 ? percentDrop + '% OFF' : 'Discount Applied'}).`
+            )
+            .input("category", sql.NVarChar(100), service.category || "General")
+            .input("post_type", sql.NVarChar(50), "price_drop")
+            .input("badge", sql.NVarChar(100), percentDrop > 0 ? `🔥 Price Drop -${percentDrop}%` : "🔥 Price Drop")
+            .input("is_popup", sql.Bit, 0)
+            .input("is_active", sql.Bit, 1)
+            .query(`
+              INSERT INTO announcements (title, description, category, post_type, badge, is_popup, is_active)
+              VALUES (@title, @description, @category, @post_type, @badge, @is_popup, @is_active)
+            `);
+        } catch (postErr) {
+          console.error("Failed to auto-post price drop announcement:", postErr);
+        }
+      }
+    }
 
     updated += 1;
   }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Loader2, TrendingUp, ArrowRight, AlertCircle } from "lucide-react";
-import { BrandingPane } from "./login";
+import { BrandingPane } from "@/components/auth/BrandingPane";
 import { Logo } from "@/components/ui/Logo";
 import { resetPasswordServerFn } from "@/lib/auth/auth.functions";
 
@@ -81,7 +81,7 @@ function ResetPasswordPage() {
     try {
       await resetPasswordServerFn({ data: { token, password } });
       toast.success("Password updated successfully. Please log in.");
-      navigate({ to: "/login", replace: true });
+      navigate({ to: "/", replace: true });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to reset password. Please try again.";
       setError(msg);
@@ -161,7 +161,7 @@ function ResetPasswordPage() {
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Remembered it?{" "}
-            <Link to="/login" className="font-semibold text-primary hover:underline">
+            <Link to="/" className="font-semibold text-primary hover:underline">
               Back to login
             </Link>
           </p>

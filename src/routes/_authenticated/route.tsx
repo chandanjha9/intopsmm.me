@@ -8,7 +8,7 @@ export const Route = createFileRoute("/_authenticated")({
       const res = await getMeServerFn();
       if (!res?.profile) {
         throw redirect({
-          to: "/login",
+          to: "/",
           search: { redirect: location.href },
         });
       }
