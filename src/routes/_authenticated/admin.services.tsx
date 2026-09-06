@@ -24,6 +24,7 @@ import {
   adminListCatalog,
   adminListServices,
   adminSaveService,
+  adminCleanDuplicateServices,
 } from "@/lib/providers/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/services")({
@@ -99,7 +100,7 @@ function AdminServicesPage() {
 
   const cleanDupes = useMutation({
     mutationFn: () => cleanDupesFn(),
-    onSuccess: (result) => {
+    onSuccess: (result: any) => {
       toast.success("Deduplication complete", {
         description: `${result.removed} duplicate services cleaned up.`,
       });

@@ -1,0 +1,32 @@
+{
+  "name": "Intopsmm - Best & Cheapest SMM Panel",
+  "short_name": "Intopsmm",
+  "description": "Boost your social media presence with 1600+ high-quality SMM services, instant delivery and 24/7 expert support.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#090d16",
+  "theme_color": "#0ea5e9",
+  "categories": ["business", "social", "utilities"],
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
