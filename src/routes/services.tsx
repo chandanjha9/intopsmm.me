@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { listPublicServices } from "@/lib/services-public.functions";
 import { Nav, Footer } from "@/routes/index";
 
+import { SITE_CONFIG } from "@/lib/seo/site-config";
+import { getBreadcrumbSchema } from "@/lib/seo/schema";
+
 export const Route = createFileRoute("/services")({
   head: () => ({
     meta: [
@@ -15,15 +18,33 @@ export const Route = createFileRoute("/services")({
       {
         name: "description",
         content:
-          "Live Intopsmm service list with per-1000 prices, minimum and maximum order quantity, refill and cancel support for Instagram, YouTube, TikTok and more.",
+          "Live Intopsmm SMM service catalogue with per-1000 prices, minimum and maximum order quantity, refill and cancel support for Instagram, YouTube, TikTok and more.",
       },
+      { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" },
       { property: "og:title", content: "Our Services & Price List — Intopsmm SMM Panel" },
       {
         property: "og:description",
         content: "Browse every Intopsmm SMM service with live prices, min/max limits and refill support.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: `${SITE_CONFIG.siteUrl}/services` },
+      { property: "og:image", content: `${SITE_CONFIG.siteUrl}/favicon.png` },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Our Services & Price List — Intopsmm SMM Panel" },
+      { name: "twitter:description", content: "Live Intopsmm SMM services with prices in INR." },
+      { name: "twitter:image", content: `${SITE_CONFIG.siteUrl}/favicon.png` },
+    ],
+    links: [{ rel: "canonical", href: `${SITE_CONFIG.siteUrl}/services` }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify(
+          getBreadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "Services", path: "/services" },
+          ]),
+        ),
+      },
     ],
   }),
   component: ServicesPage,

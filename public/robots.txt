@@ -1,4 +1,36 @@
+# ====================================================================
+# Intopsmm Production Robots.txt
+# Allows search engine spiders to index public services, blog, and content.
+# Blocks private account, dashboard, admin, and utility endpoints.
+# ====================================================================
+
 User-agent: *
 Allow: /
+Allow: /services
+Allow: /services/*
+Allow: /blog
+Allow: /blog/*
+Allow: /faq
+Allow: /about
+Allow: /contact
+Allow: /terms
 
-Sitemap: https://growmesmm.lovable.app/sitemap.xml
+# Disallow authenticated, admin, session and utility routes
+Disallow: /admin/
+Disallow: /admin
+Disallow: /dashboard/
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# Allow crawler access to critical CSS and JavaScript assets
+Allow: /assets/
+Allow: /*.js$
+Allow: /*.css$
+Allow: /*.png$
+Allow: /*.svg$
+Allow: /*.webp$
+
+# Canonical XML Sitemap
+Sitemap: https://intopsmm.me/sitemap.xml

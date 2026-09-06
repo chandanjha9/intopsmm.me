@@ -17,6 +17,7 @@ import { RouteProgress } from "@/components/RouteProgress";
 import { AuthProvider } from "@/hooks/use-auth";
 import { LanguageProvider } from "@/hooks/use-language";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { getOrganizationSchema, getWebSiteSchema } from "@/lib/seo/schema";
 
 function NotFoundComponent() {
   return (
@@ -106,22 +107,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         type: "application/ld+json",
         children: JSON.stringify({
           "@context": "https://schema.org",
-          "@graph": [
-            {
-              "@type": "WebSite",
-              name: "Intopsmm",
-              url: "https://growmesmm.lovable.app",
-              description:
-                "Fast, secure and automated SMM panel services for creators, agencies and resellers.",
-            },
-            {
-              "@type": "Organization",
-              name: "Intopsmm",
-              url: "https://growmesmm.lovable.app",
-              description:
-                "Intopsmm provides social media marketing services including followers, likes, views and engagement across all major platforms.",
-            },
-          ],
+          "@graph": [getWebSiteSchema(), getOrganizationSchema()],
         }),
       },
     ],

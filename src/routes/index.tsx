@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { AppSplashScreen } from "@/components/AppSplashScreen";
+import { SITE_CONFIG } from "@/lib/seo/site-config";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -64,8 +65,9 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Intopsmm is a fast, secure and fully automated SMM panel. 1600+ services, instant delivery, INR payments and 24/7 expert support.",
+          "Intopsmm is India's #1 fast, secure and automated SMM panel. 1600+ services, instant delivery, secure INR UPI payments and 24/7 expert support.",
       },
+      { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" },
       { property: "og:title", content: "Intopsmm — Cheapest & Fastest SMM Panel Services" },
       {
         property: "og:description",
@@ -73,10 +75,14 @@ export const Route = createFileRoute("/")({
           "1600+ high-quality services, instant delivery, secure INR payments and 24/7 support for creators, agencies and resellers.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://growmesmm.lovable.app/" },
+      { property: "og:url", content: `${SITE_CONFIG.siteUrl}/` },
+      { property: "og:image", content: `${SITE_CONFIG.siteUrl}/favicon.png` },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Intopsmm — Cheapest & Fastest SMM Panel Services" },
+      { name: "twitter:description", content: "1600+ high-quality SMM services with instant delivery in INR." },
+      { name: "twitter:image", content: `${SITE_CONFIG.siteUrl}/favicon.png` },
     ],
-    links: [{ rel: "canonical", href: "https://growmesmm.lovable.app/" }],
+    links: [{ rel: "canonical", href: `${SITE_CONFIG.siteUrl}/` }],
     scripts: [
       {
         type: "application/ld+json",
@@ -227,8 +233,11 @@ export function Nav() {
   const [open, setOpen] = useState(false);
   const { t } = useLanguage();
   const links = [
-    { to: "/services", label: "Our Services" },
-    { href: "#steps", label: t("howItWorks") },
+    { to: "/services", label: "Services" },
+    { to: "/blog", label: "Guides & Blog" },
+    { to: "/faq", label: "FAQ" },
+    { to: "/about", label: "About" },
+    { to: "/contact", label: "Contact" },
     { to: "/terms", label: t("terms") },
   ];
   return (
@@ -239,25 +248,15 @@ export function Nav() {
             <Logo />
           </a>
           <nav className="hidden items-center gap-8 md:flex">
-            {links.map((l) =>
-              l.to ? (
-                <Link
-                  key={l.to}
-                  to={l.to}
-                  className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {l.label}
-                </Link>
-              ) : (
-                <a
-                  key={l.href}
-                  href={l.href}
-                  className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {l.label}
-                </a>
-              )
-            )}
+            {links.map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {l.label}
+              </Link>
+            ))}
           </nav>
           <div className="hidden items-center gap-2 md:flex">
             <LanguageSwitcher />
@@ -278,27 +277,16 @@ export function Nav() {
         {open && (
           <div className="md:hidden border-t border-border/60 px-4 py-4">
             <div className="flex flex-col gap-3">
-              {links.map((l) =>
-                l.to ? (
-                  <Link
-                    key={l.to}
-                    to={l.to}
-                    onClick={() => setOpen(false)}
-                    className="text-sm font-medium text-muted-foreground hover:text-foreground"
-                  >
-                    {l.label}
-                  </Link>
-                ) : (
-                  <a
-                    key={l.href}
-                    href={l.href}
-                    onClick={() => setOpen(false)}
-                    className="text-sm font-medium text-muted-foreground hover:text-foreground"
-                  >
-                    {l.label}
-                  </a>
-                )
-              )}
+              {links.map((l) => (
+                <Link
+                  key={l.to}
+                  to={l.to}
+                  onClick={() => setOpen(false)}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                >
+                  {l.label}
+                </Link>
+              ))}
               <div className="mt-2">
                 <LanguageSwitcher className="w-full justify-start" />
               </div>
@@ -1178,46 +1166,146 @@ function CTASection() {
 /* ---------------- FOOTER ---------------- */
 export function Footer() {
   return (
-    <footer className="border-t border-white/20 bg-[image:var(--gradient-primary)] px-4 py-12 text-primary-foreground sm:px-6 lg:px-8">
+    <footer className="border-t border-white/20 bg-[image:var(--gradient-primary)] px-4 py-16 text-primary-foreground sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col items-start justify-between gap-8 sm:flex-row sm:items-center">
-          <div>
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
+          {/* Brand Col */}
+          <div className="lg:col-span-2">
             <div className="flex items-center">
               <Logo />
             </div>
-            <p className="mt-3 max-w-sm text-sm text-white/80">
-              The fastest, most secure and fully automated SMM panel for creators, agencies and
-              resellers.
+            <p className="mt-3 max-w-sm text-sm text-white/80 leading-relaxed">
+              India's premier high-speed automated SMM panel. Wholesale rates, 0% fee instant UPI QR deposits, and 24/7 dedicated support for creators, brands, and agencies.
             </p>
+            <div className="mt-6 flex gap-2.5">
+              {[
+                { I: Instagram, label: "Instagram", href: "https://instagram.com/intopsmm.me" },
+                { I: Youtube, label: "YouTube", href: "https://www.youtube.com/channel/UCMcQJiSFGJ-YiE3OyA3FpiA" },
+              ].map(({ I, label, href }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="grid h-10 w-10 place-items-center rounded-xl bg-white/15 text-primary-foreground shadow-sm transition hover:bg-white/25"
+                  aria-label={label}
+                >
+                  <I className="h-4 w-4" />
+                </a>
+              ))}
+            </div>
           </div>
-          <div className="flex gap-3">
-            {[
-              { I: Instagram, label: "Instagram", href: "https://instagram.com/intopsmm.me" },
-              { I: Twitter, label: "Twitter", href: "#" },
-              { I: Facebook, label: "Facebook", href: "#" },
-              { I: Youtube, label: "YouTube", href: "https://www.youtube.com/channel/UCMcQJiSFGJ-YiE3OyA3FpiA" },
-            ].map(({ I, label, href }) => (
-              <a
-                key={label}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="grid h-11 w-11 place-items-center rounded-xl bg-white/15 text-primary-foreground shadow-glow transition hover:bg-white/25"
-                aria-label={label}
-              >
-                <I className="h-5 w-5" />
-              </a>
-            ))}
+
+          {/* SMM Platforms Col */}
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-white/90">Platforms</h3>
+            <ul className="mt-4 space-y-2.5 text-xs text-white/75">
+              <li>
+                <Link to="/services/$platform" params={{ platform: "instagram" }} className="hover:text-white transition">
+                  Instagram Followers & Likes
+                </Link>
+              </li>
+              <li>
+                <Link to="/services/$platform" params={{ platform: "youtube" }} className="hover:text-white transition">
+                  YouTube Views & Watch Hours
+                </Link>
+              </li>
+              <li>
+                <Link to="/services/$platform" params={{ platform: "telegram" }} className="hover:text-white transition">
+                  Telegram Channel Members
+                </Link>
+              </li>
+              <li>
+                <Link to="/services/$platform" params={{ platform: "tiktok" }} className="hover:text-white transition">
+                  TikTok Viral Views & Likes
+                </Link>
+              </li>
+              <li>
+                <Link to="/services/$platform" params={{ platform: "facebook" }} className="hover:text-white transition">
+                  Facebook Page Followers
+                </Link>
+              </li>
+              <li>
+                <Link to="/services" className="font-semibold text-white hover:underline">
+                  View All 1600+ Services →
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Growth Guides Col */}
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-white/90">Growth Guides</h3>
+            <ul className="mt-4 space-y-2.5 text-xs text-white/75">
+              <li>
+                <Link to="/blog" className="hover:text-white transition">
+                  All Marketing Guides
+                </Link>
+              </li>
+              <li>
+                <Link to="/blog/$slug" params={{ slug: "how-to-grow-instagram-followers-organically-and-smm" }} className="hover:text-white transition">
+                  Instagram Growth 2026
+                </Link>
+              </li>
+              <li>
+                <Link to="/blog/$slug" params={{ slug: "youtube-algorithm-watch-time-optimization-guide" }} className="hover:text-white transition">
+                  YouTube Watch Time
+                </Link>
+              </li>
+              <li>
+                <Link to="/blog/$slug" params={{ slug: "telegram-channel-growth-and-monetization-strategies" }} className="hover:text-white transition">
+                  Telegram Channel Scaling
+                </Link>
+              </li>
+              <li>
+                <Link to="/blog/$slug" params={{ slug: "what-is-an-smm-panel-and-how-does-it-work" }} className="hover:text-white transition">
+                  What is an SMM Panel?
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Company & Support Col */}
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-white/90">Company</h3>
+            <ul className="mt-4 space-y-2.5 text-xs text-white/75">
+              <li>
+                <Link to="/about" className="hover:text-white transition">
+                  About Us
+                </Link>
+              </li>
+              <li>
+                <Link to="/faq" className="hover:text-white transition">
+                  Frequently Asked Questions
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="hover:text-white transition">
+                  24/7 Support Desk
+                </Link>
+              </li>
+              <li>
+                <Link to="/terms" className="hover:text-white transition">
+                  Terms & Policies
+                </Link>
+              </li>
+              <li>
+                <a href={SITE_CONFIG.whatsappLink} target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
+                  WhatsApp: {SITE_CONFIG.supportPhone}
+                </a>
+              </li>
+            </ul>
           </div>
         </div>
+
         <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-white/20 pt-8 sm:flex-row sm:items-center">
           <p className="text-xs text-white/70">
-            © {new Date().getFullYear()} Intopsmm. All rights reserved.
+            © {new Date().getFullYear()} {SITE_CONFIG.brand}. All rights reserved.
           </p>
           <p className="text-xs text-white/70">
-            Made with Intopsmm in mind —{" "}
-            <a href="mailto:intopsmm.me@gmail.com" className="hover:text-white hover:underline">
-              intopsmm.me@gmail.com
+            Official contact:{" "}
+            <a href={`mailto:${SITE_CONFIG.email}`} className="hover:text-white hover:underline">
+              {SITE_CONFIG.email}
             </a>
           </p>
         </div>
