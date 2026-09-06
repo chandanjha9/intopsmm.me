@@ -16,7 +16,6 @@ import {
   ShieldCheck,
   Gauge,
   User,
-  BadgeCheck,
   Globe2,
   Search,
   Check,
@@ -34,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/dashboard/")({
       {
         name: "description",
         content:
-          "Place new SMM orders, track your wallet balance, success rate and total orders from your Intopsmm dashboard.",
+          "Place new SMM orders, track your wallet balance and total orders from your Intopsmm dashboard.",
       },
       { property: "og:title", content: "New Order — Intopsmm Dashboard" },
       { property: "og:description", content: "Place orders, track balance and manage campaigns." },
@@ -284,11 +283,6 @@ function DashboardPage() {
       value: `≈ ₹ ${(profile?.wallet_balance ?? 0).toFixed(4)}`,
       Icon: Wallet,
     },
-    {
-      label: "Success Rate",
-      value: "93%",
-      Icon: BadgeCheck,
-    },
     { label: "Total Orders", value: (totalOrders && totalOrders > 0 ? totalOrders : 230826 + myOrders.length).toLocaleString("en-IN"), Icon: ShoppingCart },
     {
       label: "Spent Balance",
@@ -334,7 +328,7 @@ function DashboardPage() {
     <DashboardShell active="New Order">
 
           {/* Stats */}
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {stats.map((s) => (
               <Card key={s.label} className="glass border-border/60 p-3 sm:p-4 shadow-card">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
