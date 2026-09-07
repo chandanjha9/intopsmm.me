@@ -244,9 +244,9 @@ export function Nav() {
     <header className="sticky top-0 z-50 w-full">
       <div className="glass border-b border-border/60">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <a href="#home" className="flex items-center">
+          <Link to="/" className="flex items-center">
             <Logo />
-          </a>
+          </Link>
           <nav className="hidden items-center gap-8 md:flex">
             {links.map((l) => (
               <Link
