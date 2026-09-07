@@ -158,16 +158,10 @@ function MaintenanceGate({ children }: { children: ReactNode }) {
     refetchInterval: 15_000,
   });
 
-  // Check if session bypass is active
-  const isBypassed =
-    typeof window !== "undefined" &&
-    (sessionStorage.getItem("smm_maintenance_bypass") === "true" ||
-      new URLSearchParams(window.location.search).get("bypass") === "1");
+  // Only authenticated database admins can access site during maintenance
+  const isAdmin = profile?.role === "admin" || user?.role === "admin";
 
-  // Admin users or explicit bypass can proceed
-  const isAdmin = profile?.role === "admin" || user?.role === "admin" || isBypassed;
-
-  // Essential auth or admin paths are exempt so admins can log in
+  // Essential auth or admin paths so admin can log in
   const isPathExempt =
     location.pathname.startsWith("/admin") ||
     location.pathname.startsWith("/login") ||
@@ -178,11 +172,6 @@ function MaintenanceGate({ children }: { children: ReactNode }) {
       <MaintenanceScreen
         message={status.message}
         estimatedTime={status.estimatedTime}
-        onAdminBypass={() => {
-          if (typeof window !== "undefined") {
-            window.location.href = "/login?bypass=1";
-          }
-        }}
       />
     );
   }

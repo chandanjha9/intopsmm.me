@@ -210,7 +210,7 @@ function AdminOverviewPage() {
               asChild
               className="border-orange-500/30 text-xs"
             >
-              <a href="/?bypass=0" target="_blank" rel="noopener noreferrer" className="gap-1.5 flex items-center">
+              <a href="/maintenance.html" target="_blank" rel="noopener noreferrer" className="gap-1.5 flex items-center">
                 <Gamepad2 className="h-3.5 w-3.5 text-orange-400" />
                 <span>Preview Screen & Game</span>
                 <ExternalLink className="h-3 w-3 opacity-60" />

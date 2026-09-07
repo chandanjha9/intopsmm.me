@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Wrench, ShieldCheck, RefreshCw, MessageSquare, Clock, ArrowRight, Lock } from "lucide-react";
+import { useState } from "react";
+import { Wrench, ShieldCheck, RefreshCw, MessageSquare, Clock, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MaintenanceGame } from "./MaintenanceGame";
 import { useQuery } from "@tanstack/react-query";
@@ -10,18 +10,14 @@ import { toast } from "sonner";
 interface MaintenanceScreenProps {
   message?: string;
   estimatedTime?: string;
-  onAdminBypass?: () => void;
 }
 
 export function MaintenanceScreen({
   message: initialMessage,
   estimatedTime: initialEstimatedTime,
-  onAdminBypass,
 }: MaintenanceScreenProps) {
   const checkStatusFn = useServerFn(getMaintenanceStatus);
   const [isChecking, setIsChecking] = useState(false);
-  const [bypassInput, setBypassInput] = useState("");
-  const [showAdminBypass, setShowAdminBypass] = useState(false);
 
   // Poll server every 10s to see if maintenance ended
   const { data: status } = useQuery({
@@ -61,21 +57,6 @@ export function MaintenanceScreen({
       toast.info("Checking server status...");
     } finally {
       setIsChecking(false);
-    }
-  };
-
-  const handleBypassSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (bypassInput.trim().toLowerCase() === "admin" || bypassInput.trim().length >= 4) {
-      sessionStorage.setItem("smm_maintenance_bypass", "true");
-      toast.success("Admin bypass activated!");
-      if (onAdminBypass) {
-        onAdminBypass();
-      } else {
-        window.location.href = "/login?bypass=1";
-      }
-    } else {
-      toast.error("Invalid bypass code.");
     }
   };
 
@@ -188,45 +169,9 @@ export function MaintenanceScreen({
           </div>
         </main>
 
-        {/* Footer & Admin Bypass */}
+        {/* Footer */}
         <footer className="mt-6 border-t border-stone-800/80 pt-4 text-center text-xs text-stone-400">
-          <div className="flex flex-col items-center justify-between gap-2 sm:flex-row">
-            <p>© {new Date().getFullYear()} Intopsmm. All services will resume automatically once updates finish.</p>
-
-            {/* Admin Bypass Link */}
-            <div>
-              {!showAdminBypass ? (
-                <button
-                  onClick={() => setShowAdminBypass(true)}
-                  className="inline-flex items-center gap-1 text-[11px] text-stone-500 hover:text-orange-400 transition"
-                >
-                  <Lock className="h-3 w-3" />
-                  <span>Admin Access</span>
-                </button>
-              ) : (
-                <form onSubmit={handleBypassSubmit} className="flex items-center gap-2">
-                  <input
-                    type="password"
-                    value={bypassInput}
-                    onChange={(e) => setBypassInput(e.target.value)}
-                    placeholder="Admin passkey"
-                    className="h-7 w-32 rounded border border-orange-500/40 bg-stone-900 px-2 text-xs text-white placeholder:text-stone-600 focus:outline-none focus:border-orange-500"
-                    autoFocus
-                  />
-                  <Button type="submit" size="sm" className="h-7 bg-orange-500 text-[11px] font-bold text-stone-950 hover:bg-orange-400 px-2.5">
-                    Enter
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAdminBypass(false)}
-                    className="text-[11px] text-stone-500 hover:text-stone-300"
-                  >
-                    Cancel
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
+          <p>© {new Date().getFullYear()} Intopsmm. All services will resume automatically once updates finish.</p>
         </footer>
       </div>
     </div>
