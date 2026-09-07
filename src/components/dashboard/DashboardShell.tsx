@@ -205,15 +205,8 @@ export function DashboardShell({ active, children }: { active: string; children:
             <Logo className="h-8" />
           </Link>
 
-          {/* Mobile: wallet balance pill in header */}
+          {/* Mobile: menu button */}
           <div className="lg:hidden ml-auto flex items-center gap-2">
-            <Link
-              to="/dashboard/add-funds"
-              className="flex items-center gap-1.5 rounded-full bg-[image:var(--gradient-primary)] px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-glow"
-            >
-              <Wallet className="h-3.5 w-3.5" />
-              <span>{balance}</span>
-            </Link>
             <button
               aria-label="Open menu"
               onClick={() => setMenuOpen(true)}

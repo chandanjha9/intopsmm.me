@@ -14,6 +14,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { WhatsAppFab } from "@/components/WhatsAppFab";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { RouteProgress } from "@/components/RouteProgress";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { useRouterState } from "@tanstack/react-router";
 import { AuthProvider } from "@/hooks/use-auth";
 import { LanguageProvider } from "@/hooks/use-language";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -144,6 +146,9 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const isNavigating = useRouterState({
+    select: (s) => s.status === "pending" || s.isLoading || s.isTransitioning,
+  });
 
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
@@ -158,6 +163,7 @@ function RootComponent() {
       <AuthProvider>
         <LanguageProvider>
           <RouteProgress />
+          <LoadingOverlay isActive={isNavigating} />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
           <WhatsAppFab />
