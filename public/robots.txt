@@ -1,7 +1,7 @@
 # ====================================================================
 # Intopsmm Production Robots.txt
 # Allows search engine spiders to index public services, blog, and content.
-# Blocks private account, dashboard, admin, and utility endpoints.
+# Blocks private account, dashboard, admin, and sensitive utility endpoints.
 # ====================================================================
 
 User-agent: *
@@ -14,23 +14,26 @@ Allow: /faq
 Allow: /about
 Allow: /contact
 Allow: /terms
+Allow: /api/public/
 
-# Disallow authenticated, admin, session and utility routes
+# Disallow authenticated, admin, session and sensitive utility routes
 Disallow: /admin/
 Disallow: /admin
 Disallow: /dashboard/
 Disallow: /dashboard
-Disallow: /api/
 Disallow: /forgot-password
 Disallow: /reset-password
 
-# Allow crawler access to critical CSS and JavaScript assets
+# Allow crawler access to critical CSS, JS, and image assets for full page rendering
 Allow: /assets/
 Allow: /*.js$
 Allow: /*.css$
 Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
 Allow: /*.svg$
 Allow: /*.webp$
+Allow: /*.ico$
 
 # Canonical XML Sitemap
 Sitemap: https://intopsmm.me/sitemap.xml

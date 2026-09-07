@@ -90,7 +90,7 @@ function ContactPage() {
             <Sparkles className="h-3.5 w-3.5" /> 24/7 Dedicated Support
           </span>
           <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-5xl">
-            We're Here to Help You Grow
+            Contact Intopsmm — 24/7 Support Desk & Inquiries
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
             Have an inquiry about an order, custom API partnership, or automated UPI deposit? Reach out through our

@@ -58,10 +58,9 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
-  ssr: false,
   head: () => ({
     meta: [
-      { title: "Intopsmm — Affordable & Reliable SMM Panel Services" },
+      { title: "Intopsmm — SMM Panel for Social Media Growth" },
       {
         name: "description",
         content:
@@ -78,7 +77,7 @@ export const Route = createFileRoute("/")({
       { property: "og:url", content: `${SITE_CONFIG.siteUrl}/` },
       { property: "og:image", content: `${SITE_CONFIG.siteUrl}/og-image.jpg` },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Intopsmm — Affordable SMM Panel for Social Media Growth" },
+      { name: "twitter:title", content: "Intopsmm — SMM Panel for Social Media Growth" },
       { name: "twitter:description", content: "1600+ high-quality SMM services with instant delivery in INR." },
       { name: "twitter:image", content: `${SITE_CONFIG.siteUrl}/og-image.jpg` },
     ],
@@ -113,8 +112,9 @@ function Landing() {
     }
   }, [loading, session, navigate]);
 
-  if (loading || session) {
-    return <AppSplashScreen message={session ? "Opening your dashboard…" : "Connecting to Intopsmm…"} />;
+  // If already confirmed authenticated on client, show splash screen while redirecting
+  if (!loading && session) {
+    return <AppSplashScreen message="Opening your dashboard…" />;
   }
 
   return (
@@ -123,6 +123,9 @@ function Landing() {
       <PromoPopup />
       <PromoSticker />
       <Hero />
+      <ServicesDirectory />
+      <TagStrip />
+      <WhyChoose />
       <Steps />
       <Testimonials />
       <FeatureSplits />
@@ -492,6 +495,122 @@ function Hero() {
         </div>
         <div className="flex justify-center lg:justify-center">
           <HeroLoginCard />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- SERVICES DIRECTORY & CATEGORIES ---------------- */
+function ServicesDirectory() {
+  const categories = [
+    {
+      icon: Instagram,
+      name: "Instagram Growth",
+      desc: "Instant delivery followers, reels likes, views and story impressions.",
+      links: [
+        { label: "Instagram Followers", to: "/services/$platform", params: { platform: "instagram-followers" } },
+        { label: "Instagram Likes", to: "/services/$platform", params: { platform: "instagram-likes" } },
+        { label: "All Instagram Services", to: "/services/$platform", params: { platform: "instagram" } },
+      ],
+    },
+    {
+      icon: Youtube,
+      name: "YouTube Monetization",
+      desc: "High retention video views, 4000 watch hours and genuine subscribers.",
+      links: [
+        { label: "YouTube Views", to: "/services/$platform", params: { platform: "youtube-views" } },
+        { label: "Watch Hours & Subs", to: "/services/$platform", params: { platform: "youtube" } },
+        { label: "All YouTube Services", to: "/services/$platform", params: { platform: "youtube" } },
+      ],
+    },
+    {
+      icon: MessageCircle,
+      name: "Telegram Channels",
+      desc: "Channel members, auto multi-post views, reactions and boost upgrades.",
+      links: [
+        { label: "Channel Members", to: "/services/$platform", params: { platform: "telegram" } },
+        { label: "Multi-Post Views", to: "/services/$platform", params: { platform: "telegram" } },
+        { label: "All Telegram Services", to: "/services/$platform", params: { platform: "telegram" } },
+      ],
+    },
+    {
+      icon: Music2,
+      name: "TikTok Viral",
+      desc: "High-retention views, followers, likes and shares for FYP algorithm reach.",
+      links: [
+        { label: "TikTok Followers", to: "/services/$platform", params: { platform: "tiktok-followers" } },
+        { label: "TikTok Views & Likes", to: "/services/$platform", params: { platform: "tiktok" } },
+        { label: "All TikTok Services", to: "/services/$platform", params: { platform: "tiktok" } },
+      ],
+    },
+    {
+      icon: Facebook,
+      name: "Facebook Pages",
+      desc: "Page likes, profile followers, reel views and group community members.",
+      links: [
+        { label: "Page Followers & Likes", to: "/services/$platform", params: { platform: "facebook" } },
+        { label: "Video Views & Shares", to: "/services/$platform", params: { platform: "facebook" } },
+        { label: "All Facebook Services", to: "/services/$platform", params: { platform: "facebook" } },
+      ],
+    },
+    {
+      icon: Twitter,
+      name: "Twitter / X Marketing",
+      desc: "Profile followers, retweets, tweet likes and instant poll voting.",
+      links: [
+        { label: "Twitter Followers", to: "/services/$platform", params: { platform: "twitter" } },
+        { label: "Retweets & Likes", to: "/services/$platform", params: { platform: "twitter" } },
+        { label: "All Twitter Services", to: "/services/$platform", params: { platform: "twitter" } },
+      ],
+    },
+  ];
+
+  return (
+    <section className="px-4 py-16 sm:px-6 lg:px-8 border-t border-border/40 bg-secondary/20">
+      <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-3xl text-center">
+          <span className="text-xs font-bold uppercase tracking-wider text-primary">Automated SMM Solutions</span>
+          <h2 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">
+            Explore Intopsmm SMM Services & Categories
+          </h2>
+          <p className="mt-3 text-sm text-muted-foreground sm:text-base">
+            Choose from over 1,600 automated social media marketing services with instant delivery, wholesale pricing, and 24/7 support.
+          </p>
+        </div>
+
+        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {categories.map((cat) => (
+            <Card key={cat.name} className="flex flex-col justify-between p-6 shadow-card border-border/70 bg-card hover:border-primary/50 transition">
+              <div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <cat.icon className="h-6 w-6" />
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-foreground">{cat.name}</h3>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{cat.desc}</p>
+                <div className="mt-4 flex flex-col gap-2">
+                  {cat.links.map((link) => (
+                    <Link
+                      key={link.label}
+                      to={link.to as any}
+                      params={link.params as any}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                    >
+                      <ArrowRight className="h-3 w-3" /> {link.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        <div className="mt-10 text-center">
+          <Button asChild size="lg" className="font-semibold shadow-glow">
+            <Link to="/services">
+              Browse All 1600+ Services & Live Rates <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
         </div>
       </div>
     </section>

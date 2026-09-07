@@ -159,6 +159,114 @@ const PLATFORMS_DATA: Record<string, PlatformDetails> = {
       },
     ],
   },
+  "instagram-followers": {
+    name: "Instagram Followers",
+    slug: "instagram-followers",
+    headline: "Buy Instagram Followers — Real & Non-Drop Instant Delivery",
+    metaTitle: "Buy Instagram Followers — Real & Non-Drop Instant Delivery",
+    metaDescription:
+      "Buy real, active, and non-drop Instagram followers at lowest prices in India. Instant automated delivery with 365-day refill guarantee on Intopsmm SMM panel.",
+    intro:
+      "Grow your Instagram presence with genuine, high-retention followers from Intopsmm. Choose from Indian targeted followers, global active followers, and premium non-drop servers with instant start and automated refill protection.",
+    features: [
+      "Instant 0-5 Minute Order Processing",
+      "High-Retention & Non-Drop Profiles",
+      "30 to 365 Days Automatic Refill Guarantee",
+      "No Password Required — 100% Safe",
+    ],
+    faqs: [
+      {
+        q: "Will buying Instagram followers get my account suspended?",
+        a: "No. All our follower delivery methods are non-intrusive and strictly comply with Instagram's API rate limits. We only need your public username, never your password.",
+      },
+      {
+        q: "How long does it take for Instagram followers to arrive?",
+        a: "Orders begin within 1 to 5 minutes. Followers are then added at a safe, steady pace that mimics organic growth.",
+      },
+      {
+        q: "What is your refill policy for dropped followers?",
+        a: "Our Instagram follower services include an automated 30 to 365-day refill warranty. If your count drops, click 'Refill' in your user dashboard for automatic top-up.",
+      },
+    ],
+  },
+  "instagram-likes": {
+    name: "Instagram Likes",
+    slug: "instagram-likes",
+    headline: "Buy Instagram Likes — Instant High-Quality Post & Reels Likes",
+    metaTitle: "Buy Instagram Likes — High Quality & Instant Delivery",
+    metaDescription:
+      "Get instant Instagram likes on photos, carousels, and reels from ₹0.01. Safe algorithmic delivery, high reach boost, and zero drop guarantee on Intopsmm.",
+    intro:
+      "Elevate your Instagram explore feed reach with instant likes on your posts, reels, and IGTV. Intopsmm provides ultra-fast delivery with authentic profiles to skyrocket engagement rates.",
+    features: [
+      "Instant Delivery Within Seconds",
+      "Supports Photos, Carousels & Reels",
+      "Safe Algorithmic Engagement Pacing",
+      "Refill & High-Retention Guarantee",
+    ],
+    faqs: [
+      {
+        q: "Can I split likes across multiple Instagram posts?",
+        a: "Yes, you can place separate orders for each post link or utilize our bulk order tool inside the user dashboard.",
+      },
+      {
+        q: "Do Instagram likes help push posts to the Explore page?",
+        a: "Yes. Getting early, rapid engagement signals the Instagram algorithm to recommend your content to a broader audience on the Explore feed.",
+      },
+    ],
+  },
+  "youtube-views": {
+    name: "YouTube Views",
+    slug: "youtube-views",
+    headline: "Buy YouTube Views — High Retention & Monetization Safe",
+    metaTitle: "Buy YouTube Views — High Retention & Monetization Safe",
+    metaDescription:
+      "Buy YouTube views with high audience retention and monetization eligibility. Safe for AdSense, non-drop servers, and fast organic algorithmic ranking boost on Intopsmm.",
+    intro:
+      "Achieve video viral ranking and monetization milestones with high-retention YouTube views. Intopsmm provides AdSense-safe watch time and views from real geographic locations.",
+    features: [
+      "High Retention & Watch Time Safe",
+      "Monetization & AdSense Compliant",
+      "Lifetime Non-Drop Warranty Available",
+      "Fast Organic Suggested Video Ranking",
+    ],
+    faqs: [
+      {
+        q: "Are these YouTube views safe for monetized channels?",
+        a: "Yes, our views originate from real embed and suggested video sources, making them 100% compliant with YouTube AdSense guidelines.",
+      },
+      {
+        q: "How many views can I order per video?",
+        a: "You can order anywhere from 100 views up to several million views per video depending on the selected server package.",
+      },
+    ],
+  },
+  "tiktok-followers": {
+    name: "TikTok Followers",
+    slug: "tiktok-followers",
+    headline: "Buy TikTok Followers — Fast Organic FYP Reach Boost",
+    metaTitle: "Buy TikTok Followers — Instant Delivery & Growth",
+    metaDescription:
+      "Buy TikTok followers with instant automated delivery. Unlock live streaming, creator marketplace eligibility, and boost your FYP algorithm reach safely on Intopsmm.",
+    intro:
+      "Supercharge your TikTok creator profile with active followers. Reach the 1,000 follower threshold to unlock TikTok Live and creator funds effortlessly.",
+    features: [
+      "Unlock TikTok Live & Creator Perks",
+      "Fast Instant Profile Delivery",
+      "Non-Drop High Quality Profiles",
+      "No Password Needed",
+    ],
+    faqs: [
+      {
+        q: "Will these followers help unlock TikTok Live?",
+        a: "Yes! Reaching 1,000 followers on TikTok unlocks the LIVE broadcasting feature on your account.",
+      },
+      {
+        q: "Do TikTok followers drop over time?",
+        a: "Our premium servers feature high-retention profiles backed by automated refill warranties.",
+      },
+    ],
+  },
   twitter: {
     name: "Twitter / X",
     slug: "twitter",
@@ -184,6 +292,9 @@ const PLATFORMS_DATA: Record<string, PlatformDetails> = {
 };
 
 export const Route = createFileRoute("/services/$platform")({
+  loader: async () => {
+    return await listPublicServices();
+  },
   head: ({ params }) => {
     const platformParam = (params as { platform?: string }).platform || "all";
     const key = platformParam.toLowerCase();
@@ -252,10 +363,12 @@ function PlatformServicesPage() {
   const platformKey = (platform || "").toLowerCase();
   const info = PLATFORMS_DATA[platformKey];
 
+  const initialData = Route.useLoaderData();
   const fetchServices = useServerFn(listPublicServices);
   const { data, isLoading } = useQuery({
     queryKey: ["public-services"],
     queryFn: () => fetchServices(),
+    initialData,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -264,9 +377,30 @@ function PlatformServicesPage() {
   const allServices = data?.services ?? [];
   const platformServices = useMemo(() => {
     return allServices.filter((s) => {
-      const matchPlat = (s.platform ?? "").toLowerCase() === platformKey;
-      const matchCat = s.category.toLowerCase().includes(platformKey);
-      const matchName = s.name.toLowerCase().includes(platformKey);
+      const p = (s.platform ?? "").toLowerCase();
+      const c = s.category.toLowerCase();
+      const n = s.name.toLowerCase();
+
+      if (platformKey === "instagram-followers") {
+        return (p === "instagram" || c.includes("instagram") || n.includes("instagram")) &&
+          (c.includes("follower") || n.includes("follower"));
+      }
+      if (platformKey === "instagram-likes") {
+        return (p === "instagram" || c.includes("instagram") || n.includes("instagram")) &&
+          (c.includes("like") || n.includes("like"));
+      }
+      if (platformKey === "youtube-views") {
+        return (p === "youtube" || c.includes("youtube") || n.includes("youtube")) &&
+          (c.includes("view") || n.includes("view"));
+      }
+      if (platformKey === "tiktok-followers") {
+        return (p === "tiktok" || c.includes("tiktok") || n.includes("tiktok")) &&
+          (c.includes("follower") || n.includes("follower"));
+      }
+
+      const matchPlat = p === platformKey;
+      const matchCat = c.includes(platformKey);
+      const matchName = n.includes(platformKey);
       return matchPlat || matchCat || matchName;
     });
   }, [allServices, platformKey]);

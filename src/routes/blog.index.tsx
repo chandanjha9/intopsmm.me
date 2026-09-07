@@ -11,7 +11,10 @@ import { Nav, Footer } from "@/routes/index";
 import { SITE_CONFIG } from "@/lib/seo/site-config";
 import { getBreadcrumbSchema } from "@/lib/seo/schema";
 
-export const Route = createFileRoute("/blog")({
+export const Route = createFileRoute("/blog/")({
+  loader: async () => {
+    return await listBlogPosts({ data: {} });
+  },
   head: () => ({
     meta: [
       { title: "SMM Growth Blog & Social Media Guides — Intopsmm" },
@@ -51,10 +54,12 @@ export const Route = createFileRoute("/blog")({
 });
 
 function BlogIndexPage() {
+  const initialData = Route.useLoaderData();
   const fetchPosts = useServerFn(listBlogPosts);
   const { data, isLoading } = useQuery({
     queryKey: ["blog-posts"],
     queryFn: () => fetchPosts({ data: {} }),
+    initialData,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -93,7 +98,7 @@ function BlogIndexPage() {
             <BookOpen className="h-3.5 w-3.5" /> Growth & Marketing Resources
           </span>
           <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-5xl">
-            SMM Growth Blueprint & Guides
+            Intopsmm Growth Blog — Social Media Marketing Guides
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
             Actionable, non-drop algorithmic strategies to help creators, brands, and agencies conquer Instagram,

@@ -11,7 +11,10 @@ import { Nav, Footer } from "@/routes/index";
 import { SITE_CONFIG } from "@/lib/seo/site-config";
 import { getBreadcrumbSchema } from "@/lib/seo/schema";
 
-export const Route = createFileRoute("/services")({
+export const Route = createFileRoute("/services/")({
+  loader: async () => {
+    return await listPublicServices();
+  },
   head: () => ({
     meta: [
       { title: "Our Services & Price List — Intopsmm SMM Panel" },
@@ -55,10 +58,12 @@ function money(v: number) {
 }
 
 function ServicesPage() {
+  const initialData = Route.useLoaderData();
   const fetchServices = useServerFn(listPublicServices);
   const { data, isLoading } = useQuery({
     queryKey: ["public-services"],
     queryFn: () => fetchServices(),
+    initialData,
     staleTime: 5 * 60 * 1000,
   });
 

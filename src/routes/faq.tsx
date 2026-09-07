@@ -110,7 +110,7 @@ function FaqPage() {
             <HelpCircle className="h-3.5 w-3.5" /> Help & Support Center
           </span>
           <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-5xl">
-            Frequently Asked Questions
+            Frequently Asked Questions — Intopsmm SMM Panel Support
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
             Find immediate answers regarding our automated SMM services, refill policies, instant UPI deposit methods,

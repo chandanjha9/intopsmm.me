@@ -27,9 +27,21 @@ export const Route = createFileRoute("/sitemap.xml")({
           { loc: `${baseUrl}/terms`, lastmod: now, changefreq: "monthly", priority: "0.5" },
         ];
 
-        // 2. High-intent Platform Category Pages
-        const platforms = ["instagram", "youtube", "telegram", "facebook", "tiktok", "twitter", "spotify"];
-        const platformEntries: SitemapEntry[] = platforms.map((p) => ({
+        // 2. High-intent Platform & Service Category Pages
+        const servicePages = [
+          "instagram",
+          "instagram-followers",
+          "instagram-likes",
+          "youtube",
+          "youtube-views",
+          "telegram",
+          "facebook",
+          "tiktok",
+          "tiktok-followers",
+          "twitter",
+          "spotify",
+        ];
+        const platformEntries: SitemapEntry[] = servicePages.map((p) => ({
           loc: `${baseUrl}/services/${p}`,
           lastmod: now,
           changefreq: "daily",

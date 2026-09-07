@@ -22,20 +22,32 @@ import { SITE_CONFIG } from "@/lib/seo/site-config";
 import { getArticleSchema, getBreadcrumbSchema } from "@/lib/seo/schema";
 
 export const Route = createFileRoute("/blog/$slug")({
-  head: ({ params }) => {
-    // In TanStack Start head hook, we can set canonical and metadata
+  loader: async ({ params }) => {
+    return await getBlogPostBySlug({ data: { slug: (params as { slug: string }).slug } });
+  },
+  head: ({ loaderData, params }) => {
     const slug = (params as { slug: string }).slug;
+    const post = loaderData?.post;
     const canonical = `${SITE_CONFIG.siteUrl}/blog/${slug}`;
-    const defaultTitle = `${slug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())} | Intopsmm`;
+    const pageTitle = post?.seo_title || (post?.title ? `${post.title} — ${SITE_CONFIG.brand}` : `${slug.replace(/-/g, " ")} — ${SITE_CONFIG.brand}`);
+    const pageDescription = post?.seo_description || post?.excerpt || SITE_CONFIG.defaultDescription;
+    const ogImage = post?.cover_image ? (post.cover_image.startsWith("http") ? post.cover_image : `${SITE_CONFIG.siteUrl}${post.cover_image}`) : `${SITE_CONFIG.siteUrl}/favicon.png`;
 
     return {
       meta: [
-        { title: defaultTitle },
+        { title: pageTitle },
+        { name: "description", content: pageDescription },
         { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" },
+        { property: "og:title", content: pageTitle },
+        { property: "og:description", content: pageDescription },
         { property: "og:type", content: "article" },
         { property: "og:url", content: canonical },
+        { property: "og:image", content: ogImage },
         { property: "og:site_name", content: SITE_CONFIG.brand },
         { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:title", content: pageTitle },
+        { name: "twitter:description", content: pageDescription },
+        { name: "twitter:image", content: ogImage },
       ],
       links: [{ rel: "canonical", href: canonical }],
     };
@@ -45,11 +57,13 @@ export const Route = createFileRoute("/blog/$slug")({
 
 function BlogArticlePage() {
   const { slug } = Route.useParams() as { slug: string };
+  const initialData = Route.useLoaderData();
   const fetchPost = useServerFn(getBlogPostBySlug);
 
   const { data, isLoading } = useQuery({
     queryKey: ["blog-post", slug],
     queryFn: () => fetchPost({ data: { slug } }),
+    initialData,
     staleTime: 5 * 60 * 1000,
   });
 
