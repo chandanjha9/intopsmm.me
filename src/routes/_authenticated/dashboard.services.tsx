@@ -80,15 +80,17 @@ function DashboardServicesPage() {
 
   const filteredServices = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return services.filter((s) => {
-      const matchesCategory = selectedCategory === "all" || s.category === selectedCategory;
-      const matchesSearch =
-        !q ||
-        s.name.toLowerCase().includes(q) ||
-        s.category.toLowerCase().includes(q) ||
-        String(s.id).toLowerCase().includes(q);
-      return matchesCategory && matchesSearch;
-    });
+    return services
+      .filter((s) => {
+        const matchesCategory = selectedCategory === "all" || s.category === selectedCategory;
+        const matchesSearch =
+          !q ||
+          s.name.toLowerCase().includes(q) ||
+          s.category.toLowerCase().includes(q) ||
+          String(s.id).toLowerCase().includes(q);
+        return matchesCategory && matchesSearch;
+      })
+      .sort((a, b) => a.selling_rate - b.selling_rate);
   }, [services, search, selectedCategory]);
 
   return (

@@ -406,11 +406,14 @@ function PlatformServicesPage() {
   }, [allServices, platformKey]);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return platformServices;
-    const q = query.trim().toLowerCase();
-    return platformServices.filter(
-      (s) => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q),
-    );
+    let list = platformServices;
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      list = list.filter(
+        (s) => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q),
+      );
+    }
+    return [...list].sort((a, b) => a.selling_rate - b.selling_rate);
   }, [platformServices, query]);
 
   if (!info && platformServices.length === 0 && !isLoading) {

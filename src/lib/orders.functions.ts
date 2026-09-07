@@ -37,7 +37,17 @@ export const listServices = createServerFn({ method: "GET" })
         provider_service_id
       FROM services
       WHERE is_active = 1
-      ORDER BY category ASC, name ASC
+      ORDER BY 
+        CASE 
+          WHEN LOWER(LTRIM(RTRIM(ISNULL(platform, '')))) LIKE '%instagram%' OR LOWER(LTRIM(RTRIM(ISNULL(category, '')))) LIKE '%instagram%' THEN 1
+          WHEN LOWER(LTRIM(RTRIM(ISNULL(platform, '')))) LIKE '%youtube%'   OR LOWER(LTRIM(RTRIM(ISNULL(category, '')))) LIKE '%youtube%'   THEN 2
+          WHEN LOWER(LTRIM(RTRIM(ISNULL(platform, '')))) LIKE '%telegram%'  OR LOWER(LTRIM(RTRIM(ISNULL(category, '')))) LIKE '%telegram%'  THEN 3
+          WHEN LOWER(LTRIM(RTRIM(ISNULL(platform, '')))) LIKE '%tiktok%'    OR LOWER(LTRIM(RTRIM(ISNULL(category, '')))) LIKE '%tiktok%'    THEN 4
+          WHEN LOWER(LTRIM(RTRIM(ISNULL(platform, '')))) LIKE '%facebook%'  OR LOWER(LTRIM(RTRIM(ISNULL(category, '')))) LIKE '%facebook%'  THEN 5
+          ELSE 6
+        END ASC,
+        category ASC,
+        selling_rate ASC
     `);
 
     return result.recordset.map((row) => ({

@@ -72,10 +72,25 @@ function ServicesPage() {
 
   const services = data?.services ?? [];
   const loadError = data?.error ?? null;
-  const categories = useMemo(
-    () => Array.from(new Set(services.map((s) => s.category))).sort(),
-    [services],
-  );
+  const getPlatformRank = (cat: string) => {
+    const c = cat.toLowerCase();
+    if (c.includes("instagram")) return 1;
+    if (c.includes("youtube")) return 2;
+    if (c.includes("telegram")) return 3;
+    if (c.includes("tiktok")) return 4;
+    if (c.includes("facebook")) return 5;
+    return 6;
+  };
+
+  const categories = useMemo(() => {
+    const list = Array.from(new Set(services.map((s) => s.category)));
+    return list.sort((a, b) => {
+      const rankA = getPlatformRank(a);
+      const rankB = getPlatformRank(b);
+      if (rankA !== rankB) return rankA - rankB;
+      return a.localeCompare(b);
+    });
+  }, [services]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -93,7 +108,19 @@ function ServicesPage() {
       list.push(s);
       map.set(s.category, list);
     }
-    return Array.from(map.entries());
+    // Sort services within each category by price (lowest price on top, then higher)
+    for (const [, list] of map) {
+      list.sort((a, b) => a.selling_rate - b.selling_rate);
+    }
+    // Sort category sections so Instagram appears first on the page
+    const entries = Array.from(map.entries());
+    entries.sort(([catA], [catB]) => {
+      const rankA = getPlatformRank(catA);
+      const rankB = getPlatformRank(catB);
+      if (rankA !== rankB) return rankA - rankB;
+      return catA.localeCompare(catB);
+    });
+    return entries;
   }, [filtered]);
 
   return (

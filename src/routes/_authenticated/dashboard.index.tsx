@@ -255,7 +255,10 @@ function DashboardPage() {
 
   const activeCategory = categories.includes(category) ? category : (categories[0] ?? "");
   const categoryServices = useMemo(
-    () => platformServices.filter((item) => (item?.category ?? "Other") === activeCategory),
+    () =>
+      platformServices
+        .filter((item) => (item?.category ?? "Other") === activeCategory)
+        .sort((a, b) => (Number(a.selling_rate) || 0) - (Number(b.selling_rate) || 0)),
     [platformServices, activeCategory],
   );
   const service =
