@@ -1,23 +1,27 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { useServerFn } from "@tanstack/react-start";
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { WhatsAppFab } from "@/components/WhatsAppFab";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 import { RouteProgress } from "@/components/RouteProgress";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { LanguageProvider } from "@/hooks/use-language";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { getOrganizationSchema, getWebSiteSchema } from "@/lib/seo/schema";
+import { getMaintenanceStatus } from "@/lib/maintenance.functions";
+import { MaintenanceScreen } from "@/components/maintenance/MaintenanceScreen";
 
 function NotFoundComponent() {
   return (
@@ -142,6 +146,50 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function MaintenanceGate({ children }: { children: ReactNode }) {
+  const { user, profile } = useAuth();
+  const location = useRouterState({ select: (s) => s.location });
+  const checkStatus = useServerFn(getMaintenanceStatus);
+
+  const { data: status } = useQuery({
+    queryKey: ["app-maintenance-status"],
+    queryFn: () => checkStatus(),
+    staleTime: 10_000,
+    refetchInterval: 15_000,
+  });
+
+  // Check if session bypass is active
+  const isBypassed =
+    typeof window !== "undefined" &&
+    (sessionStorage.getItem("smm_maintenance_bypass") === "true" ||
+      new URLSearchParams(window.location.search).get("bypass") === "1");
+
+  // Admin users or explicit bypass can proceed
+  const isAdmin = profile?.role === "admin" || user?.role === "admin" || isBypassed;
+
+  // Essential auth or admin paths are exempt so admins can log in
+  const isPathExempt =
+    location.pathname.startsWith("/admin") ||
+    location.pathname.startsWith("/login") ||
+    location.pathname.startsWith("/api");
+
+  if (status?.isMaintenance && !isAdmin && !isPathExempt) {
+    return (
+      <MaintenanceScreen
+        message={status.message}
+        estimatedTime={status.estimatedTime}
+        onAdminBypass={() => {
+          if (typeof window !== "undefined") {
+            window.location.href = "/login?bypass=1";
+          }
+        }}
+      />
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -159,7 +207,9 @@ function RootComponent() {
         <LanguageProvider>
           <RouteProgress />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <Outlet />
+          <MaintenanceGate>
+            <Outlet />
+          </MaintenanceGate>
           <WhatsAppFab />
           <PwaInstallBanner />
           <Toaster />

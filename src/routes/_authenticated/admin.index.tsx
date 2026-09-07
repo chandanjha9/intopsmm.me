@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { Wrench, Power, ExternalLink, Gamepad2, ShieldAlert } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   adminCleanLogs,
   adminImportServices,
@@ -14,6 +17,10 @@ import {
   adminSyncBalances,
   adminSyncStatuses,
 } from "@/lib/providers/admin.functions";
+import {
+  getMaintenanceStatus,
+  setMaintenanceStatus,
+} from "@/lib/maintenance.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   head: () => ({
@@ -90,6 +97,44 @@ function AdminOverviewPage() {
   const retryJob = useJob("Retry failed orders", () => retryFn());
   const cleanJob = useJob("Log cleanup", () => cleanFn());
 
+  const checkMaintenance = useServerFn(getMaintenanceStatus);
+  const toggleMaintenance = useServerFn(setMaintenanceStatus);
+
+  const { data: maintenanceData, refetch: refetchMaintenance } = useQuery({
+    queryKey: ["admin-maintenance-status"],
+    queryFn: () => checkMaintenance(),
+  });
+
+  const [customMsg, setCustomMsg] = useState("");
+  const [customTime, setCustomTime] = useState("");
+
+  const isMActive = Boolean(maintenanceData?.isMaintenance);
+
+  const maintenanceMutation = useMutation({
+    mutationFn: async (enable: boolean) => {
+      return toggleMaintenance({
+        data: {
+          enabled: enable,
+          message: customMsg.trim() || undefined,
+          estimatedTime: customTime.trim() || undefined,
+        },
+      });
+    },
+    onSuccess: (res) => {
+      toast.success(
+        res.enabled
+          ? "Maintenance Mode is now ACTIVE! Visitors see the orange screen with the game."
+          : "Maintenance Mode is now DEACTIVATED! Site is live for everyone."
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin-maintenance-status"] });
+      void queryClient.invalidateQueries({ queryKey: ["app-maintenance-status"] });
+      void refetchMaintenance();
+    },
+    onError: (err: Error) => {
+      toast.error("Failed to update maintenance mode: " + err.message);
+    },
+  });
+
   const primary = data?.providers?.[0];
 
   return (
@@ -110,6 +155,92 @@ function AdminOverviewPage() {
               : "Degraded"}
         </Badge>
       </div>
+
+      {/* Maintenance Mode Controller */}
+      <Card
+        className={`p-5 shadow-card transition-all border-2 ${
+          isMActive
+            ? "border-orange-500/80 bg-orange-950/20 shadow-orange-500/10"
+            : "border-border/60 glass"
+        }`}
+      >
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className={`flex h-2.5 w-2.5 rounded-full ${isMActive ? "bg-orange-500 animate-pulse" : "bg-emerald-500"}`} />
+              <h2 className="text-base font-bold flex items-center gap-2">
+                <Wrench className="h-4 w-4 text-orange-400" />
+                Site Maintenance Mode & Deployment Screen
+              </h2>
+              <Badge
+                variant={isMActive ? "default" : "outline"}
+                className={
+                  isMActive
+                    ? "bg-orange-500 text-stone-950 font-bold"
+                    : "text-muted-foreground"
+                }
+              >
+                {isMActive ? "ACTIVE (Orange Screen + Game)" : "OFF (Site Live)"}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              When enabled, visitors will see the orange maintenance screen with the interactive arcade mini-game. Admins can still access the dashboard.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant={isMActive ? "destructive" : "default"}
+              size="sm"
+              disabled={maintenanceMutation.isPending}
+              onClick={() => maintenanceMutation.mutate(!isMActive)}
+              className={`gap-2 font-bold ${
+                !isMActive
+                  ? "bg-orange-500 text-stone-950 hover:bg-orange-400"
+                  : ""
+              }`}
+            >
+              <Power className="h-4 w-4" />
+              {isMActive ? "Turn Maintenance OFF" : "Turn Maintenance ON"}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="border-orange-500/30 text-xs"
+            >
+              <a href="/?bypass=0" target="_blank" rel="noopener noreferrer" className="gap-1.5 flex items-center">
+                <Gamepad2 className="h-3.5 w-3.5 text-orange-400" />
+                <span>Preview Screen & Game</span>
+                <ExternalLink className="h-3 w-3 opacity-60" />
+              </a>
+            </Button>
+          </div>
+        </div>
+
+        {/* Optional Message Config */}
+        <div className="mt-4 grid gap-3 border-t border-border/40 pt-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs text-muted-foreground">Custom Status Message (Optional):</label>
+            <Input
+              placeholder={maintenanceData?.message || "e.g. Upgrading servers for faster delivery..."}
+              value={customMsg}
+              onChange={(e) => setCustomMsg(e.target.value)}
+              className="mt-1 h-8 text-xs"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Estimated Time (Optional):</label>
+            <Input
+              placeholder={maintenanceData?.estimatedTime || "e.g. 15-30 Minutes"}
+              value={customTime}
+              onChange={(e) => setCustomTime(e.target.value)}
+              className="mt-1 h-8 text-xs"
+            />
+          </div>
+        </div>
+      </Card>
 
       {error && <Card className="glass border-border/60 p-4 text-sm text-destructive">{error.message}</Card>}
       {isLoading && <Card className="glass border-border/60 p-6 text-sm">Loading metrics…</Card>}

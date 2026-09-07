@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Under Maintenance — Intopsmm</title>
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #0c0a09;
+      color: #f5f5f4;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem 1rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+    /* Orange glow ambient background */
+    .glow-top {
+      position: absolute;
+      top: -150px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 650px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(249, 115, 22, 0.22) 0%, rgba(234, 88, 12, 0.05) 50%, transparent 70%);
+      filter: blur(50px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(to right, rgba(234, 88, 12, 0.07) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(234, 88, 12, 0.07) 1px, transparent 1px);
+      background-size: 3.5rem 3.5rem;
+      mask-image: radial-gradient(ellipse 60% 50% at 50% 0%, #000 70%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .container {
+      position: relative;
+      z-index: 10;
+      max-width: 680px;
+      width: 100%;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(249, 115, 22, 0.12);
+      border: 1px solid rgba(249, 115, 22, 0.35);
+      color: #fb923c;
+      padding: 0.35rem 0.9rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background: #f97316;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #f97316;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.3); }
+    }
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 900;
+      letter-spacing: -0.025em;
+      margin-top: 1rem;
+      line-height: 1.2;
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #fb923c, #f59e0b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p.desc {
+      color: #d6d3d1;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin-top: 0.75rem;
+    }
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.65rem;
+      margin-top: 1.25rem;
+    }
+    .status-pill {
+      background: #1c1917;
+      border: 1px solid rgba(249, 115, 22, 0.25);
+      color: #e7e5e4;
+      font-size: 0.75rem;
+      padding: 0.4rem 0.85rem;
+      border-radius: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    /* Game Box */
+    .game-card {
+      margin-top: 1.5rem;
+      border: 2px solid rgba(249, 115, 22, 0.4);
+      background: #0c0a09;
+      border-radius: 1rem;
+      overflow: hidden;
+      box-shadow: 0 15px 35px -5px rgba(249, 115, 22, 0.15);
+      position: relative;
+    }
+    .game-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      background: #1c1917;
+      border-bottom: 1px solid rgba(249, 115, 22, 0.2);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #fb923c;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 240px;
+      cursor: pointer;
+    }
+    .game-footer {
+      padding: 0.45rem 1rem;
+      background: #1c1917;
+      border-top: 1px solid rgba(249, 115, 22, 0.2);
+      font-size: 0.7rem;
+      color: #a8a29e;
+      display: flex;
+      justify-content: space-between;
+    }
+    /* Action buttons */
+    .action-row {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.6rem 1.1rem;
+      border-radius: 0.75rem;
+      text-decoration: none;
+      transition: filter 0.15s ease;
+    }
+    .btn-whatsapp {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #fff;
+    }
+    .btn-telegram {
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: #fff;
+    }
+    .btn-refresh {
+      background: #1c1917;
+      border: 1px solid rgba(249, 115, 22, 0.4);
+      color: #fb923c;
+      cursor: pointer;
+    }
+    .btn:hover { filter: brightness(1.15); }
+    footer {
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      color: #78716c;
+      text-align: center;
+    }
+    @media (max-width: 640px) {
+      h1 { font-size: 1.75rem; }
+      canvas { height: 200px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-top"></div>
+  <div class="grid-bg"></div>
+
+  <div class="container">
+    <div class="badge">
+      <span class="pulse-dot"></span>
+      <span>System Upgrade & Maintenance</span>
+    </div>
+
+    <h1>We're Upgrading Our <span class="gradient-text">Servers 🚀</span></h1>
+    <p class="desc">
+      We are currently performing scheduled maintenance and server speed upgrades. All your orders, balances, and data are 100% safe.
+    </p>
+
+    <div class="status-row">
+      <div class="status-pill">
+        <span>⏱️</span>
+        <span>Estimated Time: <strong style="color:#fdba74">~15-30 Mins</strong></span>
+      </div>
+      <div class="status-pill">
+        <span>🛡️</span>
+        <span>Orders & Balances Safe</span>
+      </div>
+      <button class="status-pill btn-refresh" onclick="location.reload()">
+        <span>🔄</span>
+        <span>Check Status</span>
+      </button>
+    </div>
+
+    <!-- Mini-Game -->
+    <div class="game-card">
+      <div class="game-bar">
+        <span>🎮 SMM CYBER RUNNER</span>
+        <span id="bestScoreText">BEST: 0</span>
+      </div>
+      <canvas id="gameCanvas"></canvas>
+      <div class="game-footer">
+        <span>Controls: <strong>Space</strong> or <strong>Tap Screen</strong> to boost</span>
+        <span style="color:#fde047">★ Collect Coins for +25 pts!</span>
+      </div>
+    </div>
+
+    <!-- Support Actions -->
+    <div class="action-row">
+      <a href="https://wa.me/917903823485?text=Hello%20Intopsmm%20Support" class="btn btn-whatsapp" target="_blank">
+        WhatsApp Support
+      </a>
+      <a href="https://t.me/intopsmm" class="btn btn-telegram" target="_blank">
+        Telegram Updates
+      </a>
+    </div>
+  </div>
+
+  <footer>
+    <p>© Intopsmm. All services will resume automatically once upgrade finishes.</p>
+  </footer>
+
+  <script>
+    // Embedded arcade runner game
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const bestScoreText = document.getElementById('bestScoreText');
+
+    let W = 600, H = 240;
+    canvas.width = W;
+    canvas.height = H;
+
+    let highScore = parseInt(localStorage.getItem('smm_offline_best') || '0', 10);
+    bestScoreText.innerText = 'BEST: ' + highScore;
+
+    let state = 'idle'; // 'idle', 'playing', 'over'
+    let rocket = { x: 50, y: 110, vy: 0, gravity: 0.38, jump: -6.5 };
+    let obstacles = [];
+    let coins = [];
+    let particles = [];
+    let frame = 0;
+    let score = 0;
+    let speed = 3;
+
+    function jump() {
+      if (state === 'idle' || state === 'over') {
+        state = 'playing';
+        rocket.y = 110;
+        rocket.vy = rocket.jump;
+        obstacles = [];
+        coins = [];
+        particles = [];
+        score = 0;
+        speed = 3;
+        frame = 0;
+      } else if (state === 'playing') {
+        rocket.vy = rocket.jump;
+        for (let i = 0; i < 5; i++) {
+          particles.push({
+            x: rocket.x - 5,
+            y: rocket.y + 6,
+            vx: -(Math.random() * 3 + 2),
+            vy: (Math.random() - 0.5) * 2,
+            size: Math.random() * 3 + 1,
+            color: '#f97316',
+            alpha: 1
+          });
+        }
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        e.preventDefault();
+        jump();
+      }
+    });
+
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      jump();
+    });
+
+    function loop() {
+      frame++;
+      ctx.fillStyle = '#0c0a09';
+      ctx.fillRect(0, 0, W, H);
+
+      // Stars
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      for (let i = 0; i < 20; i++) {
+        let sx = ((i * 31 + frame * 0.3) % W);
+        let sy = (i * 27) % H;
+        ctx.fillRect(W - sx, sy, 1.5, 1.5);
+      }
+
+      // Ground
+      ctx.strokeStyle = 'rgba(249, 115, 22, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, H - 12);
+      ctx.lineTo(W, H - 12);
+      ctx.stroke();
+
+      if (state === 'playing') {
+        rocket.vy += rocket.gravity;
+        rocket.y += rocket.vy;
+
+        if (rocket.y > H - 28) {
+          rocket.y = H - 28;
+          gameOver();
+        } else if (rocket.y < 5) {
+          rocket.y = 5;
+          rocket.vy = 0;
+        }
+
+        // Spawn obstacles
+        if (frame % 95 === 0) {
+          let gap = 95;
+          let minH = 20;
+          let maxH = H - gap - minH - 25;
+          let topH = Math.floor(Math.random() * maxH) + minH;
+          let botY = topH + gap;
+          let botH = H - botY - 12;
+
+          obstacles.push({ x: W, y: 0, w: 32, h: topH, passed: false });
+          obstacles.push({ x: W, y: botY, w: 32, h: botH, passed: false });
+
+          if (Math.random() > 0.4) {
+            coins.push({ x: W + 16, y: topH + gap / 2, r: 8, collected: false });
+          }
+        }
+
+        speed = 3 + Math.min(score * 0.02, 3);
+      }
+
+      // Obstacles
+      ctx.fillStyle = '#ea580c';
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        let ob = obstacles[i];
+        if (state === 'playing') {
+          ob.x -= speed;
+          if (!ob.passed && ob.x + ob.w < rocket.x) {
+            ob.passed = true;
+            score += 5;
+          }
+        }
+        ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
+
+        // Collision
+        if (state === 'playing') {
+          if (
+            rocket.x + 20 > ob.x &&
+            rocket.x < ob.x + ob.w &&
+            rocket.y + 14 > ob.y &&
+            rocket.y < ob.y + ob.h
+          ) {
+            gameOver();
+          }
+        }
+
+        if (ob.x < -40) obstacles.splice(i, 1);
+      }
+
+      // Coins
+      for (let i = coins.length - 1; i >= 0; i--) {
+        let c = coins[i];
+        if (state === 'playing') {
+          c.x -= speed;
+          if (Math.hypot(c.x - (rocket.x + 10), c.y - (rocket.y + 7)) < c.r + 12 && !c.collected) {
+            c.collected = true;
+            score += 25;
+          }
+        }
+        if (!c.collected) {
+          ctx.fillStyle = '#facc15';
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        if (c.x < -20 || c.collected) coins.splice(i, 1);
+      }
+
+      // Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.alpha -= 0.04;
+        if (p.alpha <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+        ctx.globalAlpha = 1;
+      }
+
+      // Draw Rocket
+      ctx.save();
+      ctx.translate(rocket.x + 10, rocket.y + 7);
+      let angle = Math.max(-0.4, Math.min(0.5, rocket.vy * 0.08));
+      ctx.rotate(angle);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(12, 0);
+      ctx.lineTo(-10, -6);
+      ctx.lineTo(-6, 0);
+      ctx.lineTo(-10, 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#f97316';
+      ctx.fillRect(-2, -2, 4, 4);
+      ctx.restore();
+
+      // Overlays
+      if (state === 'playing') {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Inter, sans-serif';
+        ctx.fillText('SCORE: ' + score, 15, 25);
+      } else if (state === 'idle') {
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#f97316';
+        ctx.font = 'bold 18px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('TAP OR PRESS SPACE TO PLAY', W / 2, H / 2 - 10);
+        ctx.fillStyle = '#d6d3d1';
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillText('Dodge glitches while servers update!', W / 2, H / 2 + 15);
+        ctx.textAlign = 'left';
+      } else if (state === 'over') {
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#f97316';
+        ctx.font = 'bold 20px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER!', W / 2, H / 2 - 15);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '13px Inter, sans-serif';
+        ctx.fillText('Score: ' + score + '   |   Best: ' + highScore, W / 2, H / 2 + 10);
+        ctx.fillStyle = '#fdba74';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.fillText('Tap or press Space to play again', W / 2, H / 2 + 32);
+        ctx.textAlign = 'left';
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    function gameOver() {
+      state = 'over';
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('smm_offline_best', String(highScore));
+        bestScoreText.innerText = 'BEST: ' + highScore;
+      }
+    }
+
+    loop();
+
+    // Auto-poll to see if server is online
+    setInterval(() => {
+      fetch('/api/health')
+        .then(r => { if (r.ok) location.reload(); })
+        .catch(() => {});
+    }, 15000);
+  </script>
+</body>
+</html>
