@@ -288,13 +288,33 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   const row = result.recordset[0];
   if (!row) return null;
 
+  let walletBalance = Number(row.wallet_balance) || 0;
+  if (row.role === "admin") {
+    try {
+      const providerRes = await db.request().query(`
+        SELECT TOP 1 last_balance 
+        FROM providers 
+        WHERE is_active = 1 
+        ORDER BY priority ASC
+      `);
+      if (
+        providerRes.recordset[0]?.last_balance !== null &&
+        providerRes.recordset[0]?.last_balance !== undefined
+      ) {
+        walletBalance = Number(providerRes.recordset[0].last_balance);
+      }
+    } catch {
+      // Keep profile wallet_balance as fallback
+    }
+  }
+
   return {
     id: row.id,
     email: row.email,
     username: row.username,
     full_name: row.full_name,
     avatar_url: row.avatar_url,
-    wallet_balance: Number(row.wallet_balance) || 0,
+    wallet_balance: walletBalance,
     role: row.role === "admin" || row.role === "moderator" ? row.role : "user",
     created_at: row.created_at,
   };

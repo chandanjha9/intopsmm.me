@@ -15,6 +15,7 @@ import {
   Calendar,
   Layers,
   AlertTriangle,
+  TrendingUp,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -77,10 +78,11 @@ function DashboardUpdatesPage() {
 
   const filterTabs = [
     { id: "all", label: "All Updates", icon: Layers },
-    { id: "alert", label: "Alerts & Notices", icon: AlertTriangle },
-    { id: "price_decrease", label: "Price Drops", icon: TrendingDown },
     { id: "new_service", label: "New Services", icon: Sparkles },
+    { id: "price_decrease", label: "Price Drops", icon: TrendingDown },
+    { id: "price_increase", label: "Rate Updates", icon: TrendingUp },
     { id: "improvement", label: "Upgrades & Speed", icon: Zap },
+    { id: "alert", label: "Alerts & Notices", icon: AlertTriangle },
   ];
 
   // Merge database announcements (priority) with system updates
@@ -123,7 +125,9 @@ function DashboardUpdatesPage() {
       const matchesType =
         activeFilter === "all" ||
         u.type === activeFilter ||
-        (activeFilter === "price_decrease" && u.type === "price_drop");
+        (activeFilter === "price_decrease" && (u.type === "price_drop" || u.type === "price_decrease")) ||
+        (activeFilter === "price_increase" && (u.type === "price_increase" || u.type === "price_up")) ||
+        (activeFilter === "new_service" && (u.type === "new_service" || u.type === "new"));
       const matchesSearch =
         !q ||
         u.title.toLowerCase().includes(q) ||

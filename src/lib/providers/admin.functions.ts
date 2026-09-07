@@ -53,8 +53,31 @@ const serviceSchema = z.object({
 export const isCurrentUserAdmin = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async ({ context }) => {
-    const isAdmin = await checkUserRole(context.userId, "admin");
-    return { isAdmin: isAdmin || context.user?.role === "admin" };
+    const isAdmin = (await checkUserRole(context.userId, "admin")) || context.user?.role === "admin";
+    if (!isAdmin) {
+      return { isAdmin: false, providerBalance: null, providerCurrency: null };
+    }
+
+    try {
+      const db = await poolConnect;
+      const res = await db.request().query(`
+        SELECT TOP 1 last_balance, currency 
+        FROM providers 
+        WHERE is_active = 1 
+        ORDER BY priority ASC
+      `);
+      const primary = res.recordset[0];
+      return {
+        isAdmin: true,
+        providerBalance:
+          primary?.last_balance !== null && primary?.last_balance !== undefined
+            ? Number(primary.last_balance)
+            : null,
+        providerCurrency: (primary?.currency as string) ?? "INR",
+      };
+    } catch {
+      return { isAdmin: true, providerBalance: null, providerCurrency: "INR" };
+    }
   });
 
 export const adminListProviders = createServerFn({ method: "GET" })

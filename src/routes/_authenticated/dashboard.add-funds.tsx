@@ -238,34 +238,8 @@ function AddFundsPage() {
           </Card>
         </div>
 
-        {/* Right Column: Instructions Card */}
-        <div className="space-y-6 lg:col-span-5">
-          <Card className="glass border-border/60 p-5 shadow-card space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-emerald-400" /> How to Add Funds
-            </h3>
-            <ol className="space-y-3 text-xs text-muted-foreground">
-              <li className="flex gap-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400 text-[11px]">1</span>
-                <span><strong>Scan the QR Code</strong> with PhonePe only.</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400 text-[11px]">2</span>
-                <span><strong>Enter amount to pay</strong> (minimum ₹{MIN_AMOUNT}).</span>
-              </li>
-              <li className="flex gap-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 font-bold text-emerald-400 text-[11px]">3</span>
-                <span><strong>Include amount and Transaction ID</strong>, tick the Terms &amp; Condition box, and tap the pay button.</span>
-              </li>
-            </ol>
-            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-[11px] text-emerald-400 font-bold leading-relaxed text-center">
-              Pay Minimum: ₹{MIN_AMOUNT}
-            </div>
-            <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-[11px] text-amber-400 font-medium leading-relaxed">
-              ⚠️ Make sure to enter the correct UTR number. Wrong UTR submissions may result in delayed credit or account suspension.
-            </div>
-          </Card>
-        </div>
+
+
       </div>
     </DashboardShell>
   );

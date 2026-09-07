@@ -33,7 +33,8 @@ export const listServices = createServerFn({ method: "GET" })
         min_quantity, 
         max_quantity, 
         refill_supported, 
-        cancel_supported
+        cancel_supported,
+        provider_service_id
       FROM services
       WHERE is_active = 1
       ORDER BY category ASC, name ASC

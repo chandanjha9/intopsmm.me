@@ -42,3 +42,6 @@ export default sql;
 
 // Initialize Render keep-alive heartbeat engine
 import("@/lib/keep-alive.server").then((m) => m.initKeepAlive()).catch(() => {});
+
+// Initialize daily provider balance sync scheduler (runs every 24 hours)
+import("@/lib/daily-scheduler.server").then((m) => m.initDailyScheduler()).catch(() => {});

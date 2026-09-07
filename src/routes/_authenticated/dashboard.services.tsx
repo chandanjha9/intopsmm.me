@@ -50,6 +50,7 @@ type ServiceItem = {
   max_quantity: number;
   refill_supported: boolean;
   cancel_supported: boolean;
+  provider_service_id: string | null;
 };
 
 function DashboardServicesPage() {
@@ -195,9 +196,9 @@ function DashboardServicesPage() {
                       key={service.id}
                       className="group transition-colors hover:bg-secondary/40"
                     >
-                      {/* Service ID */}
+                      {/* Service ID — shows actual API service ID from provider */}
                       <td className="py-3.5 pl-4 pr-3 font-mono text-xs font-semibold text-muted-foreground">
-                        #{service.id}
+                        #{service.provider_service_id ?? service.id}
                       </td>
 
                       {/* Service Name & Category */}

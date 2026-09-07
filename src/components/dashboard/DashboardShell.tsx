@@ -79,8 +79,14 @@ export function DashboardShell({ active, children }: { active: string; children:
     },
   });
 
+  const isAdmin = Boolean(adminCheck?.isAdmin || user?.role === "admin" || profile?.role === "admin");
   const username = profile?.username ?? user?.email?.split("@")[0] ?? "member";
-  const balance = `₹ ${(profile?.wallet_balance ?? 0).toFixed(4)}`;
+  
+  // Show active provider balance for admin; user wallet balance for normal customers
+  const displayBalance =
+    isAdmin && adminCheck?.providerBalance !== null && adminCheck?.providerBalance !== undefined
+      ? `${adminCheck.providerBalance.toFixed(2)} ${adminCheck.providerCurrency ?? "INR"}`
+      : `₹ ${(profile?.wallet_balance ?? 0).toFixed(4)}`;
 
   const handleConfirmSignOut = async () => {
     setIsLoggingOut(true);
@@ -97,11 +103,13 @@ export function DashboardShell({ active, children }: { active: string; children:
 
   const sidebarContent = (
     <div className="space-y-4">
-      {/* Wallet card */}
+      {/* Wallet / Provider Balance card */}
       <Card className="glass overflow-hidden border-border/60 shadow-card">
         <div className="bg-[image:var(--gradient-primary)] p-5 text-primary-foreground">
-          <p className="text-xs font-semibold uppercase tracking-widest opacity-90">Wallet Balance</p>
-          <p className="mt-1 text-3xl font-bold">{balance}</p>
+          <p className="text-xs font-semibold uppercase tracking-widest opacity-90">
+            {isAdmin ? "Provider Balance" : "Wallet Balance"}
+          </p>
+          <p className="mt-1 text-3xl font-bold">{displayBalance}</p>
         </div>
         <div className="p-3">
           <nav className="space-y-1">

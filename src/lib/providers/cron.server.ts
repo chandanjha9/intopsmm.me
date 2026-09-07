@@ -25,7 +25,15 @@ const JOBS: Record<JobName, () => Promise<Record<string, unknown>>> = {
 function isAuthorised(request: Request): boolean {
   const expected = process.env.CRON_SECRET || process.env.JWT_SECRET;
   if (!expected) return true;
+  let querySecret: string | null = null;
+  try {
+    const url = new URL(request.url);
+    querySecret = url.searchParams.get("key") || url.searchParams.get("secret");
+  } catch {
+    // Ignore invalid url parse
+  }
   const provided =
+    querySecret ??
     request.headers.get("x-cron-secret") ??
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   return Boolean(provided) && provided === expected;

@@ -25,6 +25,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuth } from "@/hooks/use-auth";
 import { formatInr } from "@/lib/providers/pricing";
 import { getTotalOrderCount, listMyOrders, listServices, placeOrder } from "@/lib/orders.functions";
+import { isCurrentUserAdmin } from "@/lib/providers/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/dashboard/")({
   head: () => ({
@@ -169,6 +170,21 @@ function DashboardPage() {
   const fetchOrders = useServerFn(listMyOrders);
   const submitOrder = useServerFn(placeOrder);
   const fetchTotalOrders = useServerFn(getTotalOrderCount);
+  const checkAdmin = useServerFn(isCurrentUserAdmin);
+
+  const { data: adminCheck } = useQuery({
+    queryKey: ["is-admin", user?.id],
+    enabled: Boolean(user?.id),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      try {
+        const res = await checkAdmin();
+        return res;
+      } catch {
+        return { isAdmin: user?.role === "admin", providerBalance: null, providerCurrency: null };
+      }
+    },
+  });
 
   const { data: allServices = [], isLoading: servicesLoading } = useQuery({
     queryKey: ["services"],
@@ -276,11 +292,17 @@ function DashboardPage() {
     .filter((order) => !["canceled", "refunded", "failed", "error"].includes(order.status))
     .reduce((sum, order) => sum + Number(order.charge ?? 0), 0);
 
+  const isAdmin = Boolean(adminCheck?.isAdmin || user?.role === "admin" || profile?.role === "admin");
+  const displayBalance =
+    isAdmin && adminCheck?.providerBalance !== null && adminCheck?.providerBalance !== undefined
+      ? `${adminCheck.providerBalance.toFixed(2)} ${adminCheck.providerCurrency ?? "INR"}`
+      : `≈ ₹ ${(profile?.wallet_balance ?? 0).toFixed(4)}`;
+
   const stats = [
     { label: "Username", value: username, Icon: User },
     {
-      label: "Balance",
-      value: `≈ ₹ ${(profile?.wallet_balance ?? 0).toFixed(4)}`,
+      label: isAdmin ? "Provider Balance" : "Balance",
+      value: displayBalance,
       Icon: Wallet,
     },
     { label: "Total Orders", value: (totalOrders && totalOrders > 0 ? totalOrders : 230826 + myOrders.length).toLocaleString("en-IN"), Icon: ShoppingCart },

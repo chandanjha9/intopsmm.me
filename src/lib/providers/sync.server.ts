@@ -69,6 +69,7 @@ export async function importProviderServices(providerId?: string | null): Promis
 
     let imported = 0;
     let updated = 0;
+    const newServicesList: { name: string; category: string; rate: number }[] = [];
 
     for (const service of remote) {
       const pServiceId = String(service.service);
@@ -112,8 +113,16 @@ export async function importProviderServices(providerId?: string | null): Promis
           );
       `);
 
-      if (isNew) imported += 1;
-      else updated += 1;
+      if (isNew) {
+        imported += 1;
+        newServicesList.push({
+          name: service.name || "SMM Service",
+          category: service.category || "General",
+          rate: Number(service.rate) || 0,
+        });
+      } else {
+        updated += 1;
+      }
     }
 
     const remoteIds = new Set(remote.map((item: { service: string | number }) => String(item.service)));
@@ -130,6 +139,54 @@ export async function importProviderServices(providerId?: string | null): Promis
             SET is_available = 0, updated_at = SYSDATETIMEOFFSET() 
             WHERE provider_id = @providerId AND provider_service_id = @missingId
           `);
+      }
+    }
+
+    // Auto-post new services to Daily Updates feed
+    if (newServicesList.length > 0) {
+      try {
+        if (newServicesList.length <= 3) {
+          for (const item of newServicesList) {
+            await db
+              .request()
+              .input("title", sql.NVarChar(255), `✨ New Service: ${item.name}`)
+              .input(
+                "description",
+                sql.NVarChar(sql.MAX),
+                `A new service "${item.name}" is now live in category "${item.category}". Instant start & fast delivery!`
+              )
+              .input("category", sql.NVarChar(100), item.category)
+              .input("post_type", sql.NVarChar(50), "new_service")
+              .input("badge", sql.NVarChar(100), "✨ New Service")
+              .input("is_popup", sql.Bit, 0)
+              .input("is_active", sql.Bit, 1)
+              .query(`
+                INSERT INTO announcements (title, description, category, post_type, badge, is_popup, is_active)
+                VALUES (@title, @description, @category, @post_type, @badge, @is_popup, @is_active)
+              `);
+          }
+        } else {
+          const uniqueCategories = [...new Set(newServicesList.map((s) => s.category))].slice(0, 4).join(", ");
+          await db
+            .request()
+            .input("title", sql.NVarChar(255), `🚀 ${newServicesList.length} New Services Added to Catalog`)
+            .input(
+              "description",
+              sql.NVarChar(sql.MAX),
+              `We have expanded our catalog with ${newServicesList.length} new services across popular categories (${uniqueCategories}). Check the Services list to place orders!`
+            )
+            .input("category", sql.NVarChar(100), "Catalog Update")
+            .input("post_type", sql.NVarChar(50), "new_service")
+            .input("badge", sql.NVarChar(100), `✨ +${newServicesList.length} Services`)
+            .input("is_popup", sql.Bit, 0)
+            .input("is_active", sql.Bit, 1)
+            .query(`
+              INSERT INTO announcements (title, description, category, post_type, badge, is_popup, is_active)
+              VALUES (@title, @description, @category, @post_type, @badge, @is_popup, @is_active)
+            `);
+        }
+      } catch (postErr) {
+        console.error("Failed to auto-post new services announcement:", postErr);
       }
     }
 
@@ -229,6 +286,34 @@ export async function resyncInternalPricing(providerId: string): Promise<number>
             `);
         } catch (postErr) {
           console.error("Failed to auto-post price drop announcement:", postErr);
+        }
+      }
+    }
+
+    // Detect price increase & auto-post update to user feed
+    if (oldRate > 0 && sellingRate > oldRate) {
+      const upDiff = sellingRate - oldRate;
+      if (upDiff >= 0.05) {
+        try {
+          await db
+            .request()
+            .input("title", sql.NVarChar(255), `📈 Rate Update: ${service.name}`)
+            .input(
+              "description",
+              sql.NVarChar(sql.MAX),
+              `Due to supplier cost adjustments, the rate for "${service.name}" has changed from ₹${oldRate.toFixed(2)} to ₹${sellingRate.toFixed(2)} per 1000. Quality and uptime remain 100% guaranteed!`
+            )
+            .input("category", sql.NVarChar(100), service.category || "General")
+            .input("post_type", sql.NVarChar(50), "price_increase")
+            .input("badge", sql.NVarChar(100), "📈 Rate Adjusted")
+            .input("is_popup", sql.Bit, 0)
+            .input("is_active", sql.Bit, 1)
+            .query(`
+              INSERT INTO announcements (title, description, category, post_type, badge, is_popup, is_active)
+              VALUES (@title, @description, @category, @post_type, @badge, @is_popup, @is_active)
+            `);
+        } catch (postErr) {
+          console.error("Failed to auto-post price increase announcement:", postErr);
         }
       }
     }
@@ -392,6 +477,18 @@ export async function syncProviderBalances(): Promise<{ providers: number }> {
         .query(`
           INSERT INTO provider_balance_logs (provider_id, balance, currency)
           VALUES (@providerId, @balance, @currency)
+        `);
+
+      // Keep admin profiles wallet_balance in sync with provider balance
+      await db
+        .request()
+        .input("adminBalance", sql.Decimal(18, 4), value)
+        .query(`
+          UPDATE profiles 
+          SET wallet_balance = @adminBalance, updated_at = SYSDATETIMEOFFSET()
+          WHERE id IN (
+            SELECT user_id FROM user_roles WHERE role = 'admin'
+          )
         `);
 
       if (value < LOW_BALANCE_THRESHOLD) {
