@@ -24,22 +24,6 @@ export const Route = createFileRoute("/_authenticated/dashboard/transactions")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  // Non-blocking prefetch so the page transition is instantaneous
-  loader: ({ context }) => {
-    void context.queryClient.prefetchQuery({
-      queryKey: ["my-transactions"],
-      queryFn: async () => {
-        const { listMyTransactions: _fn } = await import("@/lib/orders.functions");
-        try {
-          const res = await _fn();
-          return Array.isArray(res) ? res : [];
-        } catch {
-          return [];
-        }
-      },
-      staleTime: 30_000,
-    });
-  },
   component: TransactionsPage,
   errorComponent: ({ error }) => (
     <DashboardShell active="Transactions">

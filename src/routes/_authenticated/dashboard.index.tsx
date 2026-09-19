@@ -44,36 +44,6 @@ export const Route = createFileRoute("/_authenticated/dashboard/")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  // Non-blocking prefetch into the query cache so route transitions happen immediately
-  loader: ({ context }) => {
-    const { queryClient } = context;
-    void queryClient.prefetchQuery({
-      queryKey: ["services"],
-      queryFn: async () => {
-        const { listServices: _listServices } = await import("@/lib/orders.functions");
-        try {
-          const res = await _listServices();
-          return Array.isArray(res) ? res : [];
-        } catch {
-          return [];
-        }
-      },
-      staleTime: 60_000,
-    });
-    void queryClient.prefetchQuery({
-      queryKey: ["my-orders"],
-      queryFn: async () => {
-        const { listMyOrders: _listMyOrders } = await import("@/lib/orders.functions");
-        try {
-          const res = await _listMyOrders();
-          return Array.isArray(res) ? res : [];
-        } catch {
-          return [];
-        }
-      },
-      staleTime: 5_000,
-    });
-  },
   component: DashboardPage,
   errorComponent: ({ error }) => (
     <DashboardShell active="New Order">
