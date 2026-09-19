@@ -3,6 +3,7 @@ import { poolConnect } from "@/integrations/sqlServer/client";
 import { hashPassword, verifyPassword } from "./password";
 import { signToken } from "./jwt";
 import crypto from "crypto";
+import { sendTelegramSignupAlert } from "../telegram.server";
 
 export type UserProfile = {
   id: string;
@@ -173,6 +174,14 @@ export async function registerUser(input: {
     role,
     created_at: profileRow.created_at,
   };
+
+  // Dispatch Telegram Alert for New Registration
+  void sendTelegramSignupAlert({
+    email: profile.email,
+    username: profile.username || undefined,
+    fullName: profile.full_name || undefined,
+    method: "Email & Password",
+  });
 
   const token = signToken({
     sub: profile.id,
@@ -515,6 +524,14 @@ export async function upsertGoogleUser(input: {
     wallet_balance: 0,
     role,
   };
+
+  // Dispatch Telegram Alert for New Google Signup
+  void sendTelegramSignupAlert({
+    email: profile.email,
+    username: profile.username || undefined,
+    fullName: profile.full_name || undefined,
+    method: "Google OAuth",
+  });
 
   const token = signToken({ sub: profile.id, email: profile.email, role, username: profile.username });
   return { user: { id: profile.id, email: profile.email, role, username: profile.username }, profile, token };

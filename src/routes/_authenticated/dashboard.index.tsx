@@ -20,6 +20,7 @@ import {
   Search,
   Check,
   X,
+  Loader2,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuth } from "@/hooks/use-auth";
@@ -43,6 +44,36 @@ export const Route = createFileRoute("/_authenticated/dashboard/")({
       { name: "robots", content: "noindex" },
     ],
   }),
+  // Non-blocking prefetch into the query cache so route transitions happen immediately
+  loader: ({ context }) => {
+    const { queryClient } = context;
+    void queryClient.prefetchQuery({
+      queryKey: ["services"],
+      queryFn: async () => {
+        const { listServices: _listServices } = await import("@/lib/orders.functions");
+        try {
+          const res = await _listServices();
+          return Array.isArray(res) ? res : [];
+        } catch {
+          return [];
+        }
+      },
+      staleTime: 60_000,
+    });
+    void queryClient.prefetchQuery({
+      queryKey: ["my-orders"],
+      queryFn: async () => {
+        const { listMyOrders: _listMyOrders } = await import("@/lib/orders.functions");
+        try {
+          const res = await _listMyOrders();
+          return Array.isArray(res) ? res : [];
+        } catch {
+          return [];
+        }
+      },
+      staleTime: 5_000,
+    });
+  },
   component: DashboardPage,
   errorComponent: ({ error }) => (
     <DashboardShell active="New Order">
@@ -323,28 +354,78 @@ function DashboardPage() {
     maximumFractionDigits: 4,
   });
 
-  const order = useMutation({
-    mutationFn: () => {
-      if (!service) throw new Error("Select a service first");
-      return submitOrder({ data: { serviceId: service.id, link: link.trim(), quantity: qtyNum } });
-    },
-    onSuccess: () => {
-      toast.success("Order placed", { description: "Track progress in Order History." });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const canSubmit =
+    Boolean(service) &&
+    link.trim().length >= 5 &&
+    qtyNum >= (Number(service?.min_quantity) || 1) &&
+    ((Number(service?.max_quantity) || 0) === 0 || qtyNum <= (Number(service?.max_quantity) || 0)) &&
+    !isSubmitting;
+
+  const handleSubmitOrder = async () => {
+    if (isSubmitting) return;
+
+    if (!service) {
+      toast.error("Please select a service first.");
+      return;
+    }
+
+    const trimmedLink = link.trim();
+    if (!trimmedLink || trimmedLink.length < 5) {
+      toast.error("Please enter a valid link.");
+      return;
+    }
+
+    const minQty = Number(service.min_quantity) || 1;
+    const maxQty = Number(service.max_quantity) || 0;
+
+    if (!qtyNum || qtyNum < minQty) {
+      toast.error(`Minimum quantity for this service is ${minQty.toLocaleString("en-IN")}.`);
+      return;
+    }
+
+    if (maxQty > 0 && qtyNum > maxQty) {
+      toast.error(`Maximum quantity for this service is ${maxQty.toLocaleString("en-IN")}.`);
+      return;
+    }
+
+    const userBalance = Number(profile?.wallet_balance ?? 0);
+    if (userBalance < chargeValue) {
+      toast.error("Insufficient balance. Please add funds to your wallet.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await submitOrder({
+        data: {
+          serviceId: service.id,
+          link: trimmedLink,
+          quantity: qtyNum,
+        },
+      });
+
+      toast.success("Order placed successfully!", {
+        description: "Track progress in Order History.",
+      });
+
+      // Clear both inputs so user can immediately place another order without refreshing
       setLink("");
+      setQuantity("");
+
+      // Refresh balance and orders
       void refreshProfile();
       void queryClient.invalidateQueries({ queryKey: ["my-orders"] });
       void queryClient.invalidateQueries({ queryKey: ["total-orders"] });
       void queryClient.invalidateQueries({ queryKey: ["my-transactions"] });
-    },
-    onError: (error: Error) => toast.error("Order failed", { description: error.message }),
-  });
-
-  const canSubmit =
-    Boolean(service) &&
-    link.trim().length > 8 &&
-    qtyNum >= (service?.min_quantity ?? 1) &&
-    qtyNum <= (service?.max_quantity ?? 0) &&
-    !order.isPending;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to place order";
+      toast.error("Order failed", { description: msg });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
 
 
@@ -460,16 +541,12 @@ function DashboardPage() {
 
                   <Field label="Service">
                     <SelectPill
-                      value={`${service.name} — ${formatInr(Number(service.selling_rate))} per 1000`}
-                      onChange={(value) => {
-                        const match = categoryServices.find(
-                          (item) => value.startsWith(item.name),
-                        );
-                        if (match) setServiceId(match.id);
-                      }}
-                      options={categoryServices.map(
-                        (item) => `${item.name} — ${formatInr(Number(item.selling_rate))} per 1000`,
-                      )}
+                      value={service?.id ?? ""}
+                      onChange={(id) => setServiceId(id)}
+                      options={categoryServices.map((item) => ({
+                        value: item.id,
+                        label: `${item.name} — ${formatInr(Number(item.selling_rate))} per 1000`,
+                      }))}
                     />
                   </Field>
                 </div>
@@ -541,11 +618,19 @@ function DashboardPage() {
                     <Button
                       variant="hero"
                       size="lg"
-                      className="flex-1 max-w-[180px] h-12 text-base font-bold"
-                      disabled={!canSubmit}
-                      onClick={() => order.mutate()}
+                      className={`flex-1 max-w-[180px] h-12 text-base font-bold ${
+                        !canSubmit && !isSubmitting ? "opacity-75" : ""
+                      }`}
+                      disabled={isSubmitting}
+                      onClick={handleSubmitOrder}
                     >
-                      {order.isPending ? "Placing…" : "🚀 Submit Order"}
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Placing…
+                        </>
+                      ) : (
+                        "🚀 Submit Order"
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -628,6 +713,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+type SelectOption = string | { value: string; label: string };
+
 function SelectPill({
   value,
   onChange,
@@ -636,7 +723,7 @@ function SelectPill({
 }: {
   value: string;
   onChange: (v: string) => void;
-  options: string[];
+  options: SelectOption[];
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -653,6 +740,12 @@ function SelectPill({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
+  const selectedLabel = useMemo(() => {
+    const found = options.find((opt) => (typeof opt === "string" ? opt === value : opt.value === value));
+    if (!found) return value || placeholder;
+    return typeof found === "string" ? found : found.label;
+  }, [options, value, placeholder]);
+
   return (
     <div className="relative w-full" ref={dropdownRef}>
       <button
@@ -661,7 +754,7 @@ function SelectPill({
         className="flex min-h-12 w-full items-center justify-between gap-2 rounded-xl border border-border/60 bg-background px-3.5 py-2.5 text-left text-sm transition hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
       >
         <span className="line-clamp-2 break-words text-xs font-medium leading-relaxed text-foreground sm:text-sm">
-          {value || placeholder}
+          {selectedLabel}
         </span>
         <ChevronDown
           className={`ml-2 h-4 w-4 shrink-0 text-muted-foreground transition duration-200 ${
@@ -676,13 +769,15 @@ function SelectPill({
             <div className="p-4 text-center text-xs text-muted-foreground">No options</div>
           ) : (
             options.map((opt) => {
-              const isSelected = opt === value;
+              const optVal = typeof opt === "string" ? opt : opt.value;
+              const optLabel = typeof opt === "string" ? opt : opt.label;
+              const isSelected = optVal === value;
               return (
                 <button
-                  key={opt}
+                  key={optVal}
                   type="button"
                   onClick={() => {
-                    onChange(opt);
+                    onChange(optVal);
                     setOpen(false);
                   }}
                   className={`flex w-full items-start gap-2.5 rounded-lg p-3 text-left transition ${
@@ -692,7 +787,7 @@ function SelectPill({
                   }`}
                 >
                   <span className="flex-1 whitespace-normal break-words text-xs leading-relaxed sm:text-sm">
-                    {opt}
+                    {optLabel}
                   </span>
                   {isSelected && <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />}
                 </button>

@@ -70,9 +70,9 @@ export const getTotalOrderCount = createServerFn({ method: "GET" })
 export const listMyOrders = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async ({ context }) => {
-    // Trigger a live sync before querying so start_count, remains, and status
-    // are always up-to-date when the user views order history or the refill page.
-    try { await syncOrderStatuses(); } catch { /* non-fatal */ }
+    // Run status sync in background without blocking this request,
+    // ensuring order history loads in milliseconds without delay.
+    void syncOrderStatuses().catch(() => {});
     const db = await poolConnect;
     const result = await db
       .request()
@@ -135,7 +135,7 @@ export const listMyOrders = createServerFn({ method: "GET" })
 export const listMyRefills = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async ({ context }) => {
-    try { await syncOrderStatuses(); } catch { /* non-fatal */ }
+    void syncOrderStatuses().catch(() => {});
     const db = await poolConnect;
     const result = await db
       .request()

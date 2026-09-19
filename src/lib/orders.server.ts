@@ -1,7 +1,12 @@
 import sql from "mssql";
 import { poolConnect } from "@/integrations/sqlServer/client";
 import { getProviderClient, markProviderHealth } from "./providers/repository.server";
-import { sendTelegramLowBalanceAlert } from "./telegram.server";
+import {
+  sendTelegramLowBalanceAlert,
+  sendTelegramNewOrderAlert,
+  sendTelegramOrderFailedAlert,
+  sendTelegramRefillAlert,
+} from "./telegram.server";
 
 export type CreateOrderResult = {
   orderId: string;
@@ -114,6 +119,17 @@ export async function createAndForwardOrder(input: {
         VALUES (@orderId, @fromStatus, @toStatus, @note)
       `);
 
+    // Dispatch Telegram Alert for New Order
+    void sendTelegramNewOrderAlert({
+      orderId,
+      userEmail,
+      serviceName: service.name,
+      quantity: input.quantity,
+      charge,
+      link: input.link,
+      providerStatus: "Forwarded to Provider (In Progress)",
+    });
+
     return { orderId, status: "in_progress", charge };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Provider error";
@@ -201,6 +217,15 @@ export async function createAndForwardOrder(input: {
       .input("orderId", sql.UniqueIdentifier, orderId)
       .input("reason", sql.NVarChar, "Order could not be placed, amount refunded")
       .execute("sp_refund_order");
+
+    // Dispatch Telegram Alert for Failed / Refunded Order
+    void sendTelegramOrderFailedAlert({
+      orderId,
+      userEmail,
+      serviceName: service.name,
+      reason: message,
+      charge,
+    });
 
     throw new Error("We could not place this order right now. Your wallet has been refunded.");
   }
@@ -406,6 +431,22 @@ export async function requestOrderRefill(userId: string, orderId: string): Promi
         SET provider_refill_id = @refillId, status = @status, updated_at = @updatedAt 
         WHERE id = @id
       `);
+
+    // Fetch user email for refill alert
+    void (async () => {
+      try {
+        const uRes = await db.request().input("userId", sql.UniqueIdentifier, userId).query("SELECT email FROM users WHERE id = @userId");
+        const email = uRes.recordset[0]?.email || "customer";
+        void sendTelegramRefillAlert({
+          orderId,
+          userEmail: email,
+          refillId: requestId,
+          serviceName: order.service_name || undefined,
+        });
+      } catch {
+        /* non-fatal */
+      }
+    })();
 
     return { refillId: requestId };
   } catch (error) {

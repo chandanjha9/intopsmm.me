@@ -39,6 +39,22 @@ export const Route = createFileRoute("/_authenticated/dashboard/order-history")(
       { name: "robots", content: "noindex" },
     ],
   }),
+  // Non-blocking prefetch so the page transition is instantaneous
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery({
+      queryKey: ["my-orders"],
+      queryFn: async () => {
+        const { listMyOrders: _fn } = await import("@/lib/orders.functions");
+        try {
+          const res = await _fn();
+          return Array.isArray(res) ? res : [];
+        } catch {
+          return [];
+        }
+      },
+      staleTime: 5_000,
+    });
+  },
   component: OrderHistoryPage,
   errorComponent: ({ error }) => (
     <DashboardShell active="Order History">

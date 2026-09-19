@@ -3,6 +3,7 @@ import { poolConnect } from "@/integrations/sqlServer/client";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8992267163:AAFndnB3JvTAH4WllJ1e4BgIg4xaFFTj8n4";
 const TELEGRAM_ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || "5987703894";
+export const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID || "@intopsmm";
 
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
@@ -116,6 +117,177 @@ Please recharge your SMM provider account and click "Process Order" below:</i>
     console.error("[telegram] Low balance alert send error:", err);
     return false;
   }
+}
+
+/**
+ * General helper to send any HTML message to admin Telegram.
+ */
+export async function sendTelegramMessage(htmlText: string, replyMarkup?: unknown) {
+  try {
+    const body: Record<string, unknown> = {
+      chat_id: TELEGRAM_ADMIN_CHAT_ID,
+      text: htmlText,
+      parse_mode: "HTML",
+    };
+    if (replyMarkup) {
+      body.reply_markup = replyMarkup;
+    }
+    const res = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      console.warn("[telegram] Failed to send message:", data);
+    }
+    return data.ok;
+  } catch (err) {
+    console.error("[telegram] Send message error:", err);
+    return false;
+  }
+}
+
+/**
+ * Broadcasts an update or promotion directly to the public Telegram channel (@intopsmm).
+ */
+export async function sendTelegramChannelBroadcast(params: {
+  message: string;
+  buttonText?: string;
+  buttonUrl?: string;
+}) {
+  try {
+    const payload: Record<string, unknown> = {
+      chat_id: TELEGRAM_CHANNEL_ID,
+      text: params.message,
+      parse_mode: "HTML",
+      disable_web_page_preview: false,
+    };
+
+    if (params.buttonText && params.buttonUrl) {
+      payload.reply_markup = {
+        inline_keyboard: [
+          [{ text: params.buttonText, url: params.buttonUrl }],
+        ],
+      };
+    }
+
+    const res = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      console.warn("[telegram channel broadcast] Failed to post to channel:", data);
+    }
+    return data.ok;
+  } catch (err) {
+    console.error("[telegram channel broadcast] Send error:", err);
+    return false;
+  }
+}
+
+/**
+ * Sends a notification for a newly placed order.
+ */
+export async function sendTelegramNewOrderAlert(params: {
+  orderId: string;
+  userEmail: string;
+  serviceName: string;
+  quantity: number;
+  charge: number;
+  link: string;
+  providerStatus: string;
+}) {
+  const shortId = params.orderId.slice(0, 8);
+  const message = `
+🛒 <b>NEW ORDER PLACED!</b>
+━━━━━━━━━━━━━━━━━━━━━
+🆔 <b>Order ID:</b> <code>#${shortId}</code>
+👤 <b>User:</b> <code>${params.userEmail}</code>
+🛠 <b>Service:</b> ${params.serviceName}
+🔢 <b>Quantity:</b> ${params.quantity.toLocaleString("en-IN")}
+💰 <b>Amount:</b> <b>₹${params.charge.toFixed(4)}</b>
+🔗 <b>Link:</b> <code>${params.link}</code>
+📊 <b>Status:</b> ${params.providerStatus}
+⏰ <b>Time:</b> ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "short", timeStyle: "medium" })}
+━━━━━━━━━━━━━━━━━━━━━
+`.trim();
+
+  return sendTelegramMessage(message);
+}
+
+/**
+ * Sends a notification when a new user registers.
+ */
+export async function sendTelegramSignupAlert(params: {
+  email: string;
+  username?: string;
+  fullName?: string;
+  method?: "Email & Password" | "Google OAuth";
+}) {
+  const message = `
+🎉 <b>NEW USER REGISTERED!</b>
+━━━━━━━━━━━━━━━━━━━━━
+👤 <b>Username:</b> <code>${params.username || "N/A"}</code>
+📧 <b>Email:</b> <code>${params.email}</code>
+🏷️ <b>Name:</b> ${params.fullName || "N/A"}
+🔑 <b>Method:</b> ${params.method || "Email"}
+⏰ <b>Time:</b> ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "short", timeStyle: "medium" })}
+━━━━━━━━━━━━━━━━━━━━━
+`.trim();
+
+  return sendTelegramMessage(message);
+}
+
+/**
+ * Sends a notification when a user requests an order refill.
+ */
+export async function sendTelegramRefillAlert(params: {
+  orderId: string;
+  userEmail: string;
+  refillId?: string;
+  serviceName?: string;
+}) {
+  const shortId = params.orderId.slice(0, 8);
+  const message = `
+🔄 <b>NEW REFILL REQUEST!</b>
+━━━━━━━━━━━━━━━━━━━━━
+🆔 <b>Order ID:</b> <code>#${shortId}</code>
+👤 <b>User:</b> <code>${params.userEmail}</code>
+${params.serviceName ? `🛠 <b>Service:</b> ${params.serviceName}\n` : ""}⏰ <b>Time:</b> ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "short", timeStyle: "medium" })}
+━━━━━━━━━━━━━━━━━━━━━
+`.trim();
+
+  return sendTelegramMessage(message);
+}
+
+/**
+ * Sends a notification when an order fails or gets auto-refunded.
+ */
+export async function sendTelegramOrderFailedAlert(params: {
+  orderId: string;
+  userEmail: string;
+  serviceName: string;
+  reason: string;
+  charge: number;
+}) {
+  const shortId = params.orderId.slice(0, 8);
+  const message = `
+🚨 <b>ORDER FAILED & REFUNDED!</b>
+━━━━━━━━━━━━━━━━━━━━━
+🆔 <b>Order ID:</b> <code>#${shortId}</code>
+👤 <b>User:</b> <code>${params.userEmail}</code>
+🛠 <b>Service:</b> ${params.serviceName}
+💰 <b>Refunded:</b> ₹${params.charge.toFixed(4)}
+⚠️ <b>Reason:</b> <code>${params.reason}</code>
+⏰ <b>Time:</b> ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "short", timeStyle: "medium" })}
+━━━━━━━━━━━━━━━━━━━━━
+`.trim();
+
+  return sendTelegramMessage(message);
 }
 
 /**

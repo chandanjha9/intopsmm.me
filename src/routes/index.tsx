@@ -472,7 +472,7 @@ function Hero() {
         <div className="absolute right-0 top-20 h-[28rem] w-[28rem] rounded-full bg-white/10 blur-3xl" />
       </div>
       <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <div className="text-center lg:text-left">
+        <div className="order-2 text-center lg:order-1 lg:text-left">
           <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-1.5 text-xs font-bold text-foreground shadow-glow">
             <Globe2 className="h-3.5 w-3.5 text-primary" /> India Best SMM Panel
           </span>
@@ -493,7 +493,7 @@ function Hero() {
             </Button>
           </div>
         </div>
-        <div className="flex justify-center lg:justify-center">
+        <div className="order-1 flex justify-center lg:order-2 lg:justify-center">
           <HeroLoginCard />
         </div>
       </div>

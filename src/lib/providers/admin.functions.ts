@@ -376,3 +376,12 @@ export const adminProcessAllQueuedOrders = createServerFn({ method: "POST" })
     return processAllQueuedOrders();
   });
 
+export const triggerTelegramChannelDailyPost = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context.userId);
+    const { broadcastDailyServiceUpdatesToChannel } = await import("@/lib/daily-scheduler.server");
+    const ok = await broadcastDailyServiceUpdatesToChannel();
+    return { success: Boolean(ok) };
+  });
+

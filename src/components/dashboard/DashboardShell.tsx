@@ -50,7 +50,6 @@ const bottomTabItems = [
   { icon: Wallet, label: "Add Funds", to: "/dashboard/add-funds" as const },
   { icon: History, label: "History", to: "/dashboard/order-history" as const },
   { icon: ArrowLeftRight, label: "Txns", to: "/dashboard/transactions" as const },
-  { icon: User, label: "Profile", to: "/dashboard" as const, isProfile: true },
 ];
 
 export function DashboardShell({ active, children }: { active: string; children: ReactNode }) {
@@ -101,6 +100,27 @@ export function DashboardShell({ active, children }: { active: string; children:
     }
   };
 
+  // Preload top dashboard routes when idle so tab switches happen instantly with 0ms delay
+  useEffect(() => {
+    const idle = typeof window !== "undefined" && "requestIdleCallback" in window
+      ? (window as unknown as { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback
+      : (cb: () => void) => setTimeout(cb, 150);
+
+    const handle = idle(() => {
+      void router.preloadRoute({ to: "/dashboard" });
+      void router.preloadRoute({ to: "/dashboard/add-funds" });
+      void router.preloadRoute({ to: "/dashboard/order-history" });
+      void router.preloadRoute({ to: "/dashboard/transactions" });
+      void router.preloadRoute({ to: "/dashboard/services" });
+    });
+
+    return () => {
+      if (typeof window !== "undefined" && "cancelIdleCallback" in window) {
+        (window as unknown as { cancelIdleCallback: (h: number) => void }).cancelIdleCallback(handle as number);
+      }
+    };
+  }, [router]);
+
   const sidebarContent = (
     <div className="space-y-4">
       {/* Wallet / Provider Balance card */}
@@ -120,6 +140,7 @@ export function DashboardShell({ active, children }: { active: string; children:
                   key={item.label}
                   to={item.to}
                   onMouseEnter={() => router.preloadRoute({ to: item.to })}
+                  onTouchStart={() => router.preloadRoute({ to: item.to })}
                   onClick={() => setMenuOpen(false)}
                   className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                     isActive
@@ -153,6 +174,7 @@ export function DashboardShell({ active, children }: { active: string; children:
                   key={item.label}
                   to={item.to}
                   onMouseEnter={() => router.preloadRoute({ to: item.to })}
+                  onTouchStart={() => router.preloadRoute({ to: item.to })}
                   onClick={() => setMenuOpen(false)}
                   className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                     item.label === active
@@ -270,14 +292,14 @@ export function DashboardShell({ active, children }: { active: string; children:
       <nav className="fixed bottom-0 inset-x-0 z-40 lg:hidden border-t border-border/60 bg-background/95 backdrop-blur-xl">
         <div className="flex h-16 items-stretch">
           {bottomTabItems.map((item) => {
-            const isActive = item.label === active || (item.isProfile && false);
             const activeNavLabel = active;
-            const tabActive = navItems.find(n => n.label === activeNavLabel)?.to === item.to && !item.isProfile;
+            const tabActive = navItems.find((n) => n.label === activeNavLabel)?.to === item.to;
             return (
               <Link
                 key={item.label}
                 to={item.to}
                 onMouseEnter={() => router.preloadRoute({ to: item.to })}
+                onTouchStart={() => router.preloadRoute({ to: item.to })}
                 className={`flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${
                   tabActive
                     ? "text-primary"
