@@ -2,6 +2,7 @@ import sql from "mssql";
 import { poolConnect } from "@/integrations/sqlServer/client";
 import { requestOrderRefill } from "./orders.server";
 import { SITE_CONTACT } from "@/data/site-contact";
+import { fetchLiveSocialCount } from "./social-counter.server";
 
 export type TicketType = "refill" | "speed_up" | "payment" | "other";
 
@@ -217,23 +218,48 @@ async function generateAiResolution(
     // Determine current count and drop count:
     let currentCount: number;
     let dropCount: number;
+    let countSource = "baseline";
 
     const extracted = extractCountFromText(additionalInfo, finalCount, startCount);
 
     if (userProvidedCurrentCount !== null && userProvidedCurrentCount !== undefined && !isNaN(userProvidedCurrentCount)) {
+      // Priority 1: User explicitly typed count in the dedicated input
       currentCount = Math.max(0, userProvidedCurrentCount);
       dropCount = currentCount < finalCount ? currentCount - finalCount : 0;
+      countSource = "user_input";
     } else if (extracted.currentCount !== undefined) {
+      // Priority 2: User mentioned count in message/additional info
       currentCount = extracted.currentCount;
       dropCount = extracted.dropCount ?? (currentCount < finalCount ? currentCount - finalCount : 0);
-    } else if (remains > 0) {
-      currentCount = Math.max(0, finalCount - remains);
-      dropCount = -remains;
+      countSource = "message_text";
     } else {
-      // Completed order with no explicit current count entered:
-      // Real accurate baseline: current equals final count, drop is 0
-      currentCount = finalCount;
-      dropCount = 0;
+      // Priority 3: AUTOMATIC REAL-TIME LINK SCRAPING!
+      // Visits Instagram post/reel/profile, YouTube, or Telegram to scrape live count directly
+      let liveScraped: number | null = null;
+      if (order?.link) {
+        try {
+          const scraped = await fetchLiveSocialCount(order.link, order.service_name);
+          if (scraped && typeof scraped.count === "number" && scraped.count > 0) {
+            liveScraped = scraped.count;
+          }
+        } catch (scrapeErr) {
+          console.warn("Auto link scrape error in ticket:", scrapeErr);
+        }
+      }
+
+      if (liveScraped !== null) {
+        currentCount = liveScraped;
+        dropCount = currentCount < finalCount ? currentCount - finalCount : 0;
+        countSource = "live_link_scraped";
+      } else if (remains > 0) {
+        currentCount = Math.max(0, finalCount - remains);
+        dropCount = -remains;
+        countSource = "database_remains";
+      } else {
+        currentCount = finalCount;
+        dropCount = 0;
+        countSource = "baseline";
+      }
     }
 
     // Determine eligibility
@@ -292,6 +318,7 @@ Chloe`;
         notEligibleCount: isEligible ? 0 : 1,
         cooldownCount: 0,
         noticeMessage,
+        countSource,
       },
     };
   }
