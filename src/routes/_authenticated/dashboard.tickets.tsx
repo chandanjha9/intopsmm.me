@@ -152,6 +152,7 @@ function RaiseTicketPage() {
 
   const [selectedType, setSelectedType] = useState<TicketType>("refill");
   const [orderIds, setOrderIds] = useState("");
+  const [currentCountInput, setCurrentCountInput] = useState("");
   const [additionalInfo, setAdditionalInfo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -212,16 +213,19 @@ function RaiseTicketPage() {
     setIsAiThinking(true);
 
     try {
+      const currentCountVal = currentCountInput.trim() ? Number(currentCountInput.trim()) : undefined;
       const res = await submitTicket({
         data: {
           requestType: selectedType,
           orderIds: orderIds.trim() || undefined,
           additionalInfo: additionalInfo.trim() || undefined,
+          currentCount: isNaN(Number(currentCountVal)) ? undefined : currentCountVal,
         },
       });
 
       toast.success(`Ticket #${res.ticket.ticketNumber} created!`);
       setOrderIds("");
+      setCurrentCountInput("");
       setAdditionalInfo("");
 
       await queryClient.invalidateQueries({ queryKey: ["support-tickets"] });
@@ -371,17 +375,39 @@ function RaiseTicketPage() {
                       Order IDs <span className="text-destructive">*</span>
                     </Label>
                     <p className="text-[11px] text-muted-foreground">
-                      You can submit multiple Order IDs separated by commas. Example: <span className="font-mono text-foreground/80">14302193, 14302192, 14302191</span>
+                      You can submit multiple Order IDs separated by commas. Example: <span className="font-mono text-foreground/80">14441885</span>
                     </p>
                     <Input
                       id="order-ids"
                       value={orderIds}
                       onChange={(e) => setOrderIds(e.target.value)}
                       placeholder="Enter Order ID(s) for refill or speed up"
-                      className="h-11 text-sm bg-background/50 border-border/80"
+                      className="h-11 text-sm bg-background/50 border-border/80 font-mono"
                       required
                     />
                   </div>
+
+                  {/* Current Count on Link (For Refill requests) */}
+                  {selectedType === "refill" && (
+                    <div className="space-y-1.5 animate-in fade-in duration-200">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="current-count" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Current Count on Link <span className="text-[10px] text-muted-foreground/80 lowercase">(optional for live drop calculation)</span>
+                        </Label>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Enter the live followers/likes count visible on your link to compute exact drop. Example: <span className="font-mono text-foreground/80">5051</span>
+                      </p>
+                      <Input
+                        id="current-count"
+                        type="number"
+                        value={currentCountInput}
+                        onChange={(e) => setCurrentCountInput(e.target.value)}
+                        placeholder="e.g. 5051"
+                        className="h-11 text-sm bg-background/50 border-border/80 font-mono"
+                      />
+                    </div>
+                  )}
 
                   {/* Additional info */}
                   <div className="space-y-1.5">
@@ -393,7 +419,7 @@ function RaiseTicketPage() {
                       rows={3}
                       value={additionalInfo}
                       onChange={(e) => setAdditionalInfo(e.target.value)}
-                      placeholder="Optional: Add any additional details about your request if needed."
+                      placeholder="Optional: Add any additional details or drop notes about your request."
                       className="w-full rounded-md border border-border/80 bg-background/50 p-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y"
                     />
                   </div>
@@ -496,6 +522,8 @@ function RaiseTicketPage() {
                       );
                     }
 
+                    const isRefillEligible = Number(meta?.eligibleCount ?? 0) > 0;
+
                     // BOT RESPONSE
                     return (
                       <div key={m.id} className="flex flex-col items-start gap-1">
@@ -543,16 +571,16 @@ function RaiseTicketPage() {
                                 <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                                   ELIGIBLE
                                 </div>
-                                <div className="text-lg sm:text-xl font-extrabold text-emerald-600 mt-0.5">
-                                  {(meta.eligibleCount as number) ?? 1}
+                                <div className={`text-lg sm:text-xl font-extrabold mt-0.5 ${isRefillEligible ? "text-emerald-600" : "text-muted-foreground"}`}>
+                                  {Number(meta.eligibleCount ?? 0)}
                                 </div>
                               </div>
                               <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5 sm:p-3">
                                 <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                                   NOT ELIGIBLE
                                 </div>
-                                <div className="text-lg sm:text-xl font-extrabold text-muted-foreground mt-0.5">
-                                  {(meta.notEligibleCount as number) ?? 0}
+                                <div className={`text-lg sm:text-xl font-extrabold mt-0.5 ${!isRefillEligible ? "text-amber-500" : "text-muted-foreground"}`}>
+                                  {Number(meta.notEligibleCount ?? 0)}
                                 </div>
                               </div>
                               <div className="rounded-xl border border-border/60 bg-muted/20 p-2.5 sm:p-3">
@@ -560,7 +588,7 @@ function RaiseTicketPage() {
                                   COOLDOWN
                                 </div>
                                 <div className="text-lg sm:text-xl font-extrabold text-muted-foreground mt-0.5">
-                                  {(meta.cooldownCount as number) ?? 0}
+                                  {Number(meta.cooldownCount ?? 0)}
                                 </div>
                               </div>
                             </div>
@@ -568,22 +596,26 @@ function RaiseTicketPage() {
                             {/* Order Details Sub-Card */}
                             <div className="rounded-xl border border-border/80 bg-background/50 p-3.5 space-y-3">
                               <div className="flex items-center justify-between">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-600">
-                                  ✓ ELIGIBLE
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                                  isRefillEligible
+                                    ? "bg-emerald-500/15 text-emerald-600"
+                                    : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                                }`}>
+                                  {isRefillEligible ? "✓ ELIGIBLE" : "✕ NOT ELIGIBLE"}
                                 </span>
                                 <span className="text-[11px] text-muted-foreground">1 order</span>
                               </div>
 
                               <div className="flex items-center justify-between pt-1">
                                 <span className="text-xs font-bold text-foreground">
-                                  #{String(meta.orderId || "14441897")}
+                                  #{String(meta.orderId || "14441885")}
                                 </span>
                                 <span className="rounded-full bg-purple-500/15 px-2.5 py-0.5 text-[10px] font-bold text-purple-600">
                                   {String(meta.platform || "Instagram")}
                                 </span>
                               </div>
                               <div className="text-xs text-muted-foreground">
-                                {String(meta.serviceName || "Instagram Followers")}
+                                {String(meta.serviceName || "Social Media Service")}
                               </div>
 
                               {/* 4 Stats Grid */}
@@ -591,25 +623,25 @@ function RaiseTicketPage() {
                                 <div>
                                   <div className="text-[10px] font-semibold text-muted-foreground">START</div>
                                   <div className="text-xs font-bold text-foreground mt-0.5">
-                                    {Number(meta.startCount || 1730).toLocaleString()}
+                                    {Number(meta.startCount ?? 0).toLocaleString()}
                                   </div>
                                 </div>
                                 <div>
                                   <div className="text-[10px] font-semibold text-muted-foreground">FINAL</div>
                                   <div className="text-xs font-bold text-foreground mt-0.5">
-                                    {Number(meta.finalCount || 11730).toLocaleString()}
+                                    {Number(meta.finalCount ?? 0).toLocaleString()}
                                   </div>
                                 </div>
                                 <div>
                                   <div className="text-[10px] font-semibold text-muted-foreground">CURRENT</div>
                                   <div className="text-xs font-bold text-foreground mt-0.5">
-                                    {Number(meta.currentCount || 7323).toLocaleString()}
+                                    {Number(meta.currentCount ?? 0).toLocaleString()}
                                   </div>
                                 </div>
                                 <div>
                                   <div className="text-[10px] font-semibold text-muted-foreground">DROP</div>
-                                  <div className="text-xs font-bold text-destructive mt-0.5">
-                                    {Number(meta.dropCount || -4407).toLocaleString()}
+                                  <div className={`text-xs font-bold mt-0.5 ${Number(meta.dropCount ?? 0) < 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                                    {Number(meta.dropCount ?? 0).toLocaleString()}
                                   </div>
                                 </div>
                               </div>
@@ -619,15 +651,24 @@ function RaiseTicketPage() {
                                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                                   STATUS
                                 </span>
-                                <span className="text-xs font-semibold text-emerald-600">
-                                  {String(meta.status || "Forwarded to refill queue")}
+                                <span className={`text-xs font-semibold ${isRefillEligible ? "text-emerald-600" : "text-amber-500"}`}>
+                                  {String(meta.status || "Review pending")}
                                 </span>
                               </div>
                             </div>
 
-                            {/* Bottom Green Notice Box */}
-                            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-[11px] text-emerald-950 dark:text-emerald-300 leading-relaxed">
-                              Your eligible orders are now in our refill queue. We'll process them as soon as possible and notify you here once complete. If you don't hear back within 48 hours, reply to this ticket.
+                            {/* Bottom Notice Box */}
+                            <div className={`rounded-xl border p-3 text-[11px] leading-relaxed ${
+                              isRefillEligible
+                                ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-950 dark:text-emerald-300"
+                                : "border-amber-500/20 bg-amber-500/5 text-amber-950 dark:text-amber-300"
+                            }`}>
+                              {String(
+                                meta.noticeMessage ||
+                                (isRefillEligible
+                                  ? "Your eligible orders are now in our refill queue. We'll process them as soon as possible and notify you here once complete. If you don't hear back within 48 hours, reply to this ticket."
+                                  : "This service is not eligible for automated refills. If you need assistance, please contact our support team directly on WhatsApp.")
+                              )}
                             </div>
                           </div>
                         ) : meta?.type === "speed_up" ? (

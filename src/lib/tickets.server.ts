@@ -120,13 +120,59 @@ async function findOrderData(userId: string, idInput: string) {
 }
 
 /**
+ * Extracts a current count or drop amount mentioned in freeform text.
+ */
+function extractCountFromText(
+  text: string | undefined,
+  finalCount: number,
+  startCount: number
+): { currentCount?: number; dropCount?: number } {
+  if (!text) return {};
+  const cleaned = text.replace(/,/g, "").trim();
+  const lower = cleaned.toLowerCase();
+
+  // Pattern 1: Explicit drop mentioned like "drop: 50", "dropped 50", "50 drop", "-50"
+  const dropMatch = lower.match(/(?:drop(?:ped)?\s*[:=-]?\s*(\d+)|(\d+)\s*(?:drop|dropped))/);
+  if (dropMatch) {
+    const dropped = Number(dropMatch[1] || dropMatch[2]);
+    if (dropped > 0 && dropped <= finalCount) {
+      return { currentCount: Math.max(0, finalCount - dropped), dropCount: -dropped };
+    }
+  }
+
+  // Pattern 2: Explicit current count mentioned like "current: 5051", "abhi 5051", "now 5051", "5051 count"
+  const currentMatch = lower.match(/(?:current(?:_count)?|abhi|now|count|live|present|remaining|still)\s*[:=-]?\s*(\d+)/);
+  if (currentMatch) {
+    const val = Number(currentMatch[1]);
+    if (val > 0) {
+      return { currentCount: val, dropCount: val < finalCount ? val - finalCount : 0 };
+    }
+  }
+
+  // Pattern 3: Look for any standalone numbers that are within a realistic range of start & final count
+  const numbers = cleaned.match(/\b\d+\b/g);
+  if (numbers) {
+    for (const numStr of numbers) {
+      const num = Number(numStr);
+      // If it looks like a count between start and finalCount (or slightly higher), use it
+      if (num >= startCount && num <= finalCount + 500 && num !== finalCount) {
+        return { currentCount: num, dropCount: num < finalCount ? num - finalCount : 0 };
+      }
+    }
+  }
+
+  return {};
+}
+
+/**
  * Generates an automated AI response based on request category and real order details.
  */
 async function generateAiResolution(
   userId: string,
   requestType: TicketType,
   orderIdsRaw: string,
-  additionalInfo?: string
+  additionalInfo?: string,
+  userProvidedCurrentCount?: number | null
 ): Promise<{ message: string; metadata: Record<string, unknown> }> {
   const orderList = orderIdsRaw
     .split(/[\s,]+/)
@@ -137,8 +183,8 @@ async function generateAiResolution(
   const order = firstOrderId ? await findOrderData(userId, firstOrderId) : null;
 
   if (requestType === "refill") {
-    const displayId = order?.provider_order_id || firstOrderId || "14441897";
-    const serviceName = order?.service_name || "Instagram Followers";
+    const displayId = order?.provider_order_id || firstOrderId || "14441885";
+    const serviceName = order?.service_name || "Social Media Service";
 
     // Detect platform
     let platform = "Instagram";
@@ -150,20 +196,71 @@ async function generateAiResolution(
     else if (lowerName.includes("twitter") || lowerName.includes(" x ")) platform = "X / Twitter";
     else if (lowerName.includes("spotify")) platform = "Spotify";
 
-    const quantity = Number(order?.quantity) || 10000;
-    const startCount = Number(order?.start_count) || 1730;
+    const quantity = Number(order?.quantity) || 0;
+    const startCount = Number(order?.start_count) || 0;
     const finalCount = startCount + quantity;
     const remains = Number(order?.remains) || 0;
 
-    // Calculate dynamic drop: if order is found with remains or completed
-    let currentCount = order ? (remains > 0 ? finalCount - remains : Math.floor(finalCount * 0.62)) : 7323;
-    if (currentCount > finalCount) currentCount = Math.floor(finalCount * 0.7);
-    const dropCount = -(finalCount - currentCount);
+    // Check if the service strictly supports refills
+    const isNoRefill =
+      lowerName.includes("no refill") ||
+      lowerName.includes("non refill") ||
+      lowerName.includes("no-refill") ||
+      lowerName.includes("without refill");
+    const isRefillSupportedByService =
+      order?.refill_supported !== null &&
+      order?.refill_supported !== undefined &&
+      Number(order.refill_supported) === 1 &&
+      !isNoRefill;
+    const isCompleted = (order?.status || "").toLowerCase() === "completed";
 
-    const isEligible = Boolean(!order || order.status === "completed" || order.refill_supported !== false);
-    const statusText = isEligible ? "Forwarded to refill queue" : "Review pending";
+    // Determine current count and drop count:
+    let currentCount: number;
+    let dropCount: number;
 
-    if (order && order.status === "completed" && order.refill_supported) {
+    const extracted = extractCountFromText(additionalInfo, finalCount, startCount);
+
+    if (userProvidedCurrentCount !== null && userProvidedCurrentCount !== undefined && !isNaN(userProvidedCurrentCount)) {
+      currentCount = Math.max(0, userProvidedCurrentCount);
+      dropCount = currentCount < finalCount ? currentCount - finalCount : 0;
+    } else if (extracted.currentCount !== undefined) {
+      currentCount = extracted.currentCount;
+      dropCount = extracted.dropCount ?? (currentCount < finalCount ? currentCount - finalCount : 0);
+    } else if (remains > 0) {
+      currentCount = Math.max(0, finalCount - remains);
+      dropCount = -remains;
+    } else {
+      // Completed order with no explicit current count entered:
+      // Real accurate baseline: current equals final count, drop is 0
+      currentCount = finalCount;
+      dropCount = 0;
+    }
+
+    // Determine eligibility
+    let isEligible = false;
+    let statusText = "Forwarded to refill queue";
+    let noticeMessage = "";
+
+    if (!order) {
+      statusText = "Order not found in account";
+      noticeMessage = "We could not find this Order ID in your active orders. Please verify the ID or contact support on WhatsApp.";
+    } else if (isNoRefill || !isRefillSupportedByService) {
+      isEligible = false;
+      statusText = "Ineligible: No Refill service";
+      noticeMessage = "This service is a 'No Refill' service. Automatic refill is not supported by the provider for this service. If you need special assistance, please contact support directly on WhatsApp.";
+    } else if (!isCompleted) {
+      isEligible = false;
+      statusText = `Ineligible: Order is ${order.status}`;
+      noticeMessage = `This order is currently marked as ${order.status}. Refill can only be requested after the order has completed delivery.`;
+    } else if (dropCount >= 0) {
+      isEligible = false;
+      statusText = "No drop detected";
+      noticeMessage = `The current count (${currentCount.toLocaleString()}) matches or exceeds the delivered count (${finalCount.toLocaleString()}). If you see a drop on your page, please reply to this ticket with your live count.`;
+    } else {
+      isEligible = true;
+      statusText = "Forwarded to refill queue";
+      noticeMessage = "Your eligible orders are now in our refill queue. We'll process them as soon as possible and notify you here once complete. If you don't hear back within 48 hours, reply to this ticket.";
+
       try {
         void requestOrderRefill(userId, order.id).catch(() => {});
       } catch {}
@@ -175,7 +272,7 @@ ${serviceName}
 Start: ${startCount.toLocaleString()} | Final: ${finalCount.toLocaleString()} | Current: ${currentCount.toLocaleString()} | Drop: ${dropCount.toLocaleString()}
 Status: ${statusText}
 
-Your eligible orders are now in our refill queue. We'll process them as soon as possible and notify you here once complete. If you don't hear back within 48 hours, reply to this ticket.
+${noticeMessage}
 
 Chloe`;
 
@@ -194,12 +291,13 @@ Chloe`;
         eligibleCount: isEligible ? 1 : 0,
         notEligibleCount: isEligible ? 0 : 1,
         cooldownCount: 0,
+        noticeMessage,
       },
     };
   }
 
   if (requestType === "speed_up") {
-    const displayId = order?.provider_order_id || firstOrderId || "14441897";
+    const displayId = order?.provider_order_id || firstOrderId || "14441885";
     const orderStatus = (order?.status || "").toLowerCase();
 
     let statusMsg = "";
@@ -269,6 +367,7 @@ export async function createTicket(
     requestType: TicketType;
     orderIds?: string;
     additionalInfo?: string;
+    currentCount?: number | null;
   }
 ): Promise<{ ticket: TicketSummary; aiMessage: TicketMessage }> {
   await ensureTicketTables();
@@ -304,10 +403,13 @@ export async function createTicket(
   const ticketNumber = ticketRow.ticket_number;
 
   // Format user prompt message matching Screenshot 2 & 3:
-  // "Order ID: Order Ids - 14441897 Request: Speed Up"
-  const userMessageContent = orderIdsClean
+  let userMessageContent = orderIdsClean
     ? `Order ID: Order Ids - ${orderIdsClean} Request: ${requestLabel}`
     : `Request: ${requestLabel}${input.additionalInfo ? ` - ${input.additionalInfo}` : ""}`;
+  
+  if (input.currentCount !== null && input.currentCount !== undefined && !isNaN(input.currentCount)) {
+    userMessageContent += ` | Current Count: ${input.currentCount.toLocaleString()}`;
+  }
 
   await db
     .request()
@@ -319,12 +421,13 @@ export async function createTicket(
       VALUES (@ticketId, @senderType, @message)
     `);
 
-  // Generate AI resolution
+  // Generate AI resolution with accurate count calculation
   const { message: aiContent, metadata } = await generateAiResolution(
     userId,
     input.requestType,
     orderIdsClean,
-    input.additionalInfo
+    input.additionalInfo,
+    input.currentCount
   );
 
   const aiMsgRes = await db
@@ -516,6 +619,38 @@ export async function sendTicketReply(
     `);
 
   const row = msgRes.recordset[0];
+
+  // Auto-respond with recalculated metrics if user provides updated count on a refill ticket
+  const ticketInfo = ticketRes.recordset[0];
+  if (ticketInfo && ticketInfo.request_type === "refill" && ticketInfo.order_ids) {
+    const extracted = extractCountFromText(cleanMessage, 1000000, 0);
+    if (extracted.currentCount !== undefined) {
+      try {
+        const { message: aiContent, metadata } = await generateAiResolution(
+          userId,
+          "refill",
+          ticketInfo.order_ids,
+          cleanMessage,
+          extracted.currentCount
+        );
+
+        await db
+          .request()
+          .input("ticketId", sql.UniqueIdentifier, ticketId)
+          .input("senderType", sql.NVarChar, "ai_bot")
+          .input("message", sql.NVarChar, aiContent)
+          .input("metadata", sql.NVarChar, JSON.stringify(metadata))
+          .query(`
+            INSERT INTO ticket_messages (ticket_id, sender_type, message, metadata_json)
+            VALUES (@ticketId, @senderType, @message, @metadata);
+            UPDATE support_tickets SET has_unread = 1, updated_at = SYSDATETIMEOFFSET() WHERE id = @ticketId;
+          `);
+      } catch (err) {
+        console.warn("Auto-reply recalculation error:", err);
+      }
+    }
+  }
+
   return {
     id: row.id,
     ticketId,

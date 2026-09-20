@@ -13,6 +13,7 @@ const createTicketSchema = z.object({
   requestType: z.enum(["refill", "speed_up", "payment", "other"]),
   orderIds: z.string().max(500).optional(),
   additionalInfo: z.string().max(2000).optional(),
+  currentCount: z.number().nullable().optional(),
 });
 
 export const createTicketServerFn = createServerFn({ method: "POST" })
@@ -23,6 +24,7 @@ export const createTicketServerFn = createServerFn({ method: "POST" })
       requestType: data.requestType as TicketType,
       orderIds: data.orderIds,
       additionalInfo: data.additionalInfo,
+      currentCount: data.currentCount,
     });
   });
 
