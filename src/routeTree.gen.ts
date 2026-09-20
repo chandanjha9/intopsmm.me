@@ -36,6 +36,7 @@ import { Route as AuthenticatedDashboardAddFundsRouteImport } from './routes/_au
 import { Route as AuthenticatedDashboardOrderHistoryRouteImport } from './routes/_authenticated/dashboard.order-history'
 import { Route as AuthenticatedDashboardRefillRouteImport } from './routes/_authenticated/dashboard.refill'
 import { Route as AuthenticatedDashboardServicesRouteImport } from './routes/_authenticated/dashboard.services'
+import { Route as AuthenticatedDashboardTicketsRouteImport } from './routes/_authenticated/dashboard.tickets'
 import { Route as AuthenticatedDashboardTransactionsRouteImport } from './routes/_authenticated/dashboard.transactions'
 import { Route as AuthenticatedDashboardUpdatesRouteImport } from './routes/_authenticated/dashboard.updates'
 import { Route as ApiPublicPingRouteImport } from './routes/api/public/ping'
@@ -189,6 +190,12 @@ const AuthenticatedDashboardServicesRoute =
     path: '/dashboard/services',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDashboardTicketsRoute =
+  AuthenticatedDashboardTicketsRouteImport.update({
+    id: '/dashboard/tickets',
+    path: '/dashboard/tickets',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedDashboardTransactionsRoute =
   AuthenticatedDashboardTransactionsRouteImport.update({
     id: '/dashboard/transactions',
@@ -272,6 +279,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/order-history': typeof AuthenticatedDashboardOrderHistoryRoute
   '/dashboard/refill': typeof AuthenticatedDashboardRefillRoute
   '/dashboard/services': typeof AuthenticatedDashboardServicesRoute
+  '/dashboard/tickets': typeof AuthenticatedDashboardTicketsRoute
   '/dashboard/transactions': typeof AuthenticatedDashboardTransactionsRoute
   '/dashboard/updates': typeof AuthenticatedDashboardUpdatesRoute
   '/api/public/ping': typeof ApiPublicPingRoute
@@ -309,6 +317,7 @@ export interface FileRoutesByTo {
   '/dashboard/order-history': typeof AuthenticatedDashboardOrderHistoryRoute
   '/dashboard/refill': typeof AuthenticatedDashboardRefillRoute
   '/dashboard/services': typeof AuthenticatedDashboardServicesRoute
+  '/dashboard/tickets': typeof AuthenticatedDashboardTicketsRoute
   '/dashboard/transactions': typeof AuthenticatedDashboardTransactionsRoute
   '/dashboard/updates': typeof AuthenticatedDashboardUpdatesRoute
   '/api/public/ping': typeof ApiPublicPingRoute
@@ -349,6 +358,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/order-history': typeof AuthenticatedDashboardOrderHistoryRoute
   '/_authenticated/dashboard/refill': typeof AuthenticatedDashboardRefillRoute
   '/_authenticated/dashboard/services': typeof AuthenticatedDashboardServicesRoute
+  '/_authenticated/dashboard/tickets': typeof AuthenticatedDashboardTicketsRoute
   '/_authenticated/dashboard/transactions': typeof AuthenticatedDashboardTransactionsRoute
   '/_authenticated/dashboard/updates': typeof AuthenticatedDashboardUpdatesRoute
   '/api/public/ping': typeof ApiPublicPingRoute
@@ -389,6 +399,7 @@ export interface FileRouteTypes {
     | '/dashboard/order-history'
     | '/dashboard/refill'
     | '/dashboard/services'
+    | '/dashboard/tickets'
     | '/dashboard/transactions'
     | '/dashboard/updates'
     | '/api/public/ping'
@@ -426,6 +437,7 @@ export interface FileRouteTypes {
     | '/dashboard/order-history'
     | '/dashboard/refill'
     | '/dashboard/services'
+    | '/dashboard/tickets'
     | '/dashboard/transactions'
     | '/dashboard/updates'
     | '/api/public/ping'
@@ -465,6 +477,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/order-history'
     | '/_authenticated/dashboard/refill'
     | '/_authenticated/dashboard/services'
+    | '/_authenticated/dashboard/tickets'
     | '/_authenticated/dashboard/transactions'
     | '/_authenticated/dashboard/updates'
     | '/api/public/ping'
@@ -696,6 +709,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardServicesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dashboard/tickets': {
+      id: '/_authenticated/dashboard/tickets'
+      path: '/dashboard/tickets'
+      fullPath: '/dashboard/tickets'
+      preLoaderRoute: typeof AuthenticatedDashboardTicketsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard/transactions': {
       id: '/_authenticated/dashboard/transactions'
       path: '/dashboard/transactions'
@@ -799,6 +819,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardOrderHistoryRoute: typeof AuthenticatedDashboardOrderHistoryRoute
   AuthenticatedDashboardRefillRoute: typeof AuthenticatedDashboardRefillRoute
   AuthenticatedDashboardServicesRoute: typeof AuthenticatedDashboardServicesRoute
+  AuthenticatedDashboardTicketsRoute: typeof AuthenticatedDashboardTicketsRoute
   AuthenticatedDashboardTransactionsRoute: typeof AuthenticatedDashboardTransactionsRoute
   AuthenticatedDashboardUpdatesRoute: typeof AuthenticatedDashboardUpdatesRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
@@ -811,6 +832,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedDashboardOrderHistoryRoute,
   AuthenticatedDashboardRefillRoute: AuthenticatedDashboardRefillRoute,
   AuthenticatedDashboardServicesRoute: AuthenticatedDashboardServicesRoute,
+  AuthenticatedDashboardTicketsRoute: AuthenticatedDashboardTicketsRoute,
   AuthenticatedDashboardTransactionsRoute:
     AuthenticatedDashboardTransactionsRoute,
   AuthenticatedDashboardUpdatesRoute: AuthenticatedDashboardUpdatesRoute,

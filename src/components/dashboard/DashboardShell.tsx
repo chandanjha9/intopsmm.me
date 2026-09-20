@@ -26,6 +26,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  LifeBuoy,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -40,6 +41,7 @@ const navItems = [
   { icon: History, label: "Order History", to: "/dashboard/order-history" as const, emoji: "📋" },
   { icon: ArrowLeftRight, label: "Transactions", to: "/dashboard/transactions" as const, emoji: "💸" },
   { icon: RefreshCcw, label: "Refill", to: "/dashboard/refill" as const, emoji: "🔄" },
+  { icon: LifeBuoy, label: "Raise Ticket", to: "/dashboard/tickets" as const, emoji: "🎫" },
   { icon: ListChecks, label: "Services", to: "/dashboard/services" as const, emoji: "⚡" },
   { icon: BellRing, label: "Daily Updates", to: "/dashboard/updates" as const, emoji: "📢" },
 ];
