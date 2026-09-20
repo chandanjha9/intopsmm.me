@@ -1,6 +1,6 @@
 import sql from "mssql";
 import { createServerFn } from "@tanstack/react-start";
-import { setCookie, deleteCookie } from "@tanstack/react-start/server";
+import { setCookie, deleteCookie, getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import {
   loginUser,
@@ -38,10 +38,23 @@ const registerSchema = z.object({
 const COOKIE_NAME = "auth_token";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days — persistent session
 
+function isSecureRequest(): boolean {
+  try {
+    const req = getRequest();
+    if (!req) return false;
+    const proto = req.headers.get("x-forwarded-proto") || "";
+    if (proto === "https") return true;
+    if (proto === "http") return false;
+    if (req.url && req.url.startsWith("http://")) return false;
+    if (req.url && req.url.startsWith("https://")) return true;
+  } catch {}
+  return process.env.NODE_ENV === "production";
+}
+
 function setAuthCookie(token: string) {
   setCookie(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureRequest(),
     sameSite: "lax",
     path: "/",
     maxAge: COOKIE_MAX_AGE,

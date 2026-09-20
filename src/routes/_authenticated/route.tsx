@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, isRedirect } from "@tanstack/react-router";
 import { getMeServerFn } from "@/lib/auth/auth.functions";
 
 // Stable query key for the auth session cache
@@ -8,13 +8,10 @@ export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async ({ location, context }) => {
     try {
-      // ensureQueryData returns instantly from cache on repeat navigations.
-      // DB / Firebase is only hit once per 5-minute window, making module
-      // switches feel near-instant instead of waiting 300-700 ms every time.
       const res = await context.queryClient.ensureQueryData({
         queryKey: ME_QUERY_KEY,
         queryFn: () => getMeServerFn(),
-        staleTime: 5 * 60_000, // treat cached session as fresh for 5 minutes
+        staleTime: 15_000, // 15 seconds cache so repeat navigations are fast but new logins are fresh
       });
 
       if (!res?.profile) {
@@ -26,12 +23,12 @@ export const Route = createFileRoute("/_authenticated")({
       return { user: res.user, profile: res.profile };
     } catch (err) {
       // Re-throw TanStack redirect objects — they are intentional navigations
-      if (err instanceof Response || (err && typeof err === "object" && "to" in err)) {
+      if (isRedirect(err)) {
         throw err;
       }
-      // Any real auth/network error → redirect to login
+      // Any real auth/network error → redirect to home
       throw redirect({
-        to: "/login",
+        to: "/",
         search: { redirect: location.href },
       });
     }

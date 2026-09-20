@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   loginServerFn,
   registerServerFn,
@@ -35,6 +36,8 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const AUTH_QUERY_KEY = ["auth", "me"] as const;
+
 function profileToAuthUser(profile: UserProfile): AuthUser {
   return {
     id: profile.id,
@@ -49,6 +52,7 @@ function profileToAuthUser(profile: UserProfile): AuthUser {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,15 +61,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await getMeServerFn();
       if (res?.profile) {
+        queryClient.setQueryData(AUTH_QUERY_KEY, res);
         setProfile(res.profile);
         setUser(profileToAuthUser(res.profile));
         try { localStorage.setItem("intopsmm_has_session", "true"); } catch {}
       } else {
+        queryClient.setQueryData(AUTH_QUERY_KEY, { profile: null, user: null });
         setUser(null);
         setProfile(null);
         try { localStorage.removeItem("intopsmm_has_session"); } catch {}
       }
     } catch {
+      queryClient.setQueryData(AUTH_QUERY_KEY, { profile: null, user: null });
       setUser(null);
       setProfile(null);
       try { localStorage.removeItem("intopsmm_has_session"); } catch {}
@@ -81,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const result = await loginServerFn({ data: { email, password } });
     if (result?.profile) {
+      queryClient.setQueryData(AUTH_QUERY_KEY, { profile: result.profile, user: result.user });
       setProfile(result.profile);
       setUser(profileToAuthUser(result.profile));
       try { localStorage.setItem("intopsmm_has_session", "true"); } catch {}
@@ -90,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, username?: string, fullName?: string) => {
     const result = await registerServerFn({ data: { email, password, username, fullName } });
     if (result?.profile) {
+      queryClient.setQueryData(AUTH_QUERY_KEY, { profile: result.profile, user: result.user });
       setProfile(result.profile);
       setUser(profileToAuthUser(result.profile));
       try { localStorage.setItem("intopsmm_has_session", "true"); } catch {}
@@ -109,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await googleAuthServerFn({ data: { idToken } });
 
     if (result?.profile) {
+      queryClient.setQueryData(AUTH_QUERY_KEY, { profile: result.profile, user: result.user });
       setProfile(result.profile);
       setUser(profileToAuthUser(result.profile));
       try { localStorage.setItem("intopsmm_has_session", "true"); } catch {}
@@ -119,6 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await logoutServerFn();
     } finally {
+      queryClient.setQueryData(AUTH_QUERY_KEY, { profile: null, user: null });
+      queryClient.removeQueries({ queryKey: ["auth"] });
       setUser(null);
       setProfile(null);
       try { localStorage.removeItem("intopsmm_has_session"); } catch {}

@@ -107,13 +107,17 @@ function Landing() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("redirect=")) {
+      return;
+    }
     if (!loading && session) {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [loading, session, navigate]);
 
-  // If already confirmed authenticated on client, show splash screen while redirecting
-  if (!loading && session) {
+  // If already confirmed authenticated on client and not bounced, show splash screen while redirecting
+  const isBounced = typeof window !== "undefined" && window.location.search.includes("redirect=");
+  if (!loading && session && !isBounced) {
     return <AppSplashScreen message="Opening your dashboard…" />;
   }
 
