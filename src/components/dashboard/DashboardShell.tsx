@@ -73,7 +73,7 @@ export function DashboardShell({ active, children }: { active: string; children:
         const res = await checkAdmin();
         return res;
       } catch {
-        return { isAdmin: user?.role === "admin" };
+        return { isAdmin: user?.role === "admin", providerBalance: null, providerCurrency: null };
       }
     },
   });
