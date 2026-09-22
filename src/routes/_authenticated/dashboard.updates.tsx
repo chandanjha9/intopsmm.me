@@ -33,6 +33,20 @@ export const Route = createFileRoute("/_authenticated/dashboard/updates")({
       { name: "robots", content: "noindex" },
     ],
   }),
+  loader: async ({ context }) => {
+    await Promise.all([
+      context.queryClient.ensureQueryData({
+        queryKey: ["user-announcements-list"],
+        queryFn: () => getUserActiveAnnouncements(),
+        staleTime: 60 * 1000,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["daily-updates-list"],
+        queryFn: () => listDailyUpdates(),
+        staleTime: 60 * 1000,
+      }),
+    ]);
+  },
   component: DashboardUpdatesPage,
 });
 
@@ -45,6 +59,7 @@ type CombinedFeedItem = {
   date: string;
   type: string;
   isPopup?: boolean;
+  serviceId?: string;
   serviceName?: string;
   oldRate?: number;
   newRate?: number;
@@ -61,7 +76,8 @@ function DashboardUpdatesPage() {
       const res = await fetchAnnouncements();
       return res || [];
     },
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 
   const { data: systemUpdates = [], isLoading: isSystemLoading } = useQuery<DailyUpdate[]>({
@@ -71,6 +87,7 @@ function DashboardUpdatesPage() {
       return res || [];
     },
     staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 
   const [search, setSearch] = useState("");
@@ -110,6 +127,7 @@ function DashboardUpdatesPage() {
       badge: u.badge,
       date: u.date,
       type: u.type,
+      serviceId: u.serviceId,
       serviceName: u.serviceName,
       oldRate: u.oldRate,
       newRate: u.newRate,
@@ -138,7 +156,7 @@ function DashboardUpdatesPage() {
     });
   }, [combinedItems, search, activeFilter]);
 
-  const isLoading = isAnnouncementsLoading || isSystemLoading;
+  const isLoading = (isAnnouncementsLoading || isSystemLoading) && combinedItems.length === 0;
 
   return (
     <DashboardShell active="Daily Updates">
@@ -285,7 +303,16 @@ function DashboardUpdatesPage() {
                       variant="hero"
                       size="sm"
                       className="gap-1.5 text-xs"
-                      onClick={() => navigate({ to: "/dashboard" })}
+                      onClick={() =>
+                        navigate({
+                          to: "/dashboard",
+                          search: {
+                            serviceId: item.serviceId,
+                            serviceName: item.serviceName || (item.type !== "alert" ? item.title : undefined),
+                            category: item.category,
+                          },
+                        })
+                      }
                     >
                       Place Order <ArrowRight className="h-3.5 w-3.5" />
                     </Button>

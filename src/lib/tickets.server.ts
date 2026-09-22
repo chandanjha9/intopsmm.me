@@ -183,6 +183,40 @@ async function generateAiResolution(
   const firstOrderId = orderList[0] || "";
   const order = firstOrderId ? await findOrderData(userId, firstOrderId) : null;
 
+  // Early exit: if an order ID was provided but not found in the user's account
+  if (firstOrderId && !order && (requestType === "refill" || requestType === "speed_up")) {
+    const waText = encodeURIComponent(
+      `Hi Intopsmm Support! I raised a ticket but my Order ID #${firstOrderId} was not found. Please help me check this order.`
+    );
+    const waUrl = `${SITE_CONTACT.whatsappLink}?text=${waText}`;
+
+    const notFoundMessage = `Hi! We checked your request for Order #${firstOrderId}.
+
+❌ **Order Not Found**
+We could not find Order ID **#${firstOrderId}** in your account. This could be because:
+- The Order ID you entered is incorrect or belongs to a different account
+- The order may not exist in our system
+
+Please double-check your Order ID from your **Orders History** page and try again.
+
+If you believe this is an error, please contact our support team directly.
+
+👉 [**Chat on WhatsApp**](${waUrl})
+
+Chloe`;
+
+    return {
+      message: notFoundMessage,
+      metadata: {
+        type: requestType,
+        orderId: firstOrderId,
+        status: "Order Not Found",
+        noticeMessage: `Order #${firstOrderId} was not found in your account.`,
+        whatsappUrl: waUrl,
+      },
+    };
+  }
+
   if (requestType === "refill") {
     const displayId = order?.provider_order_id || firstOrderId || "14441885";
     const serviceName = order?.service_name || "Social Media Service";
@@ -268,6 +302,7 @@ async function generateAiResolution(
     let noticeMessage = "";
 
     if (!order) {
+      // This branch is now only reached when no order ID was provided at all
       statusText = "Order not found in account";
       noticeMessage = "We could not find this Order ID in your active orders. Please verify the ID or contact support on WhatsApp.";
     } else if (isNoRefill || !isRefillSupportedByService) {
@@ -324,7 +359,7 @@ Chloe`;
   }
 
   if (requestType === "speed_up") {
-    const displayId = order?.provider_order_id || firstOrderId || "14441885";
+    const displayId = order?.provider_order_id || firstOrderId;
     const orderStatus = (order?.status || "").toLowerCase();
 
     let statusMsg = "";

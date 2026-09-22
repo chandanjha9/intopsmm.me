@@ -17,8 +17,9 @@ export type CreateOrderResult = {
 
 /**
  * Creates the local order (wallet debited atomically in SQL Server Stored Procedure),
- * then forwards it to the provider. If provider lacks funds, the order is safely queued
- * for admin and an instant Telegram notification is dispatched.
+ * then immediately returns confirmation to user while forwarding to the provider
+ * in the background. If provider lacks funds, the order is safely queued for admin
+ * and an instant Telegram notification is dispatched.
  */
 export async function createAndForwardOrder(input: {
   userId: string;
@@ -48,186 +49,220 @@ export async function createAndForwardOrder(input: {
 
   if (!orderId) throw new Error("Order could not be created");
 
-  // 2. Fetch service provider details & user email
-  const [serviceResult, orderResult, userResult] = await Promise.all([
-    db
-      .request()
-      .input("serviceId", sql.UniqueIdentifier, input.serviceId)
-      .query("SELECT name, provider_id, provider_service_id FROM services WHERE id = @serviceId"),
-    db
-      .request()
-      .input("orderId", sql.UniqueIdentifier, orderId)
-      .query("SELECT charge FROM orders WHERE id = @orderId"),
-    db
-      .request()
-      .input("userId", sql.UniqueIdentifier, input.userId)
-      .query("SELECT email FROM users WHERE id = @userId"),
-  ]);
+  // Fast single-row indexed lookup for charge
+  const orderResult = await db
+    .request()
+    .input("orderId", sql.UniqueIdentifier, orderId)
+    .query("SELECT charge FROM orders WHERE id = @orderId");
 
-  const service = serviceResult.recordset[0];
   const charge = Number(orderResult.recordset[0]?.charge ?? 0);
-  const userEmail = userResult.recordset[0]?.email ?? "customer";
 
-  if (!service?.provider_service_id) {
-    await db
-      .request()
-      .input("orderId", sql.UniqueIdentifier, orderId)
-      .input("reason", sql.NVarChar, "Service is not linked to a provider")
-      .execute("sp_refund_order");
-    throw new Error("This service is temporarily unavailable");
-  }
-
-  const requestPayload = {
-    service: service.provider_service_id,
+  // 2. Run provider forwarding & alerts in background (non-blocking for instant user response)
+  void forwardOrderToProvider({
+    orderId,
+    userId: input.userId,
+    serviceId: input.serviceId,
     link: input.link,
     quantity: input.quantity,
-  };
+    charge,
+  });
+
+  return { orderId, status: "pending", charge };
+}
+
+/**
+ * Background worker: sends the order to the external provider API,
+ * records provider_orders, updates order status, and sends Telegram alerts.
+ */
+async function forwardOrderToProvider(params: {
+  orderId: string;
+  userId: string;
+  serviceId: string;
+  link: string;
+  quantity: number;
+  charge: number;
+}): Promise<void> {
+  const { orderId, userId, serviceId, link, quantity, charge } = params;
 
   try {
-    const { row, client } = await getProviderClient(service.provider_id);
-    const response = await client.createOrder(requestPayload);
-    await markProviderHealth(row.id, null);
+    const db = await poolConnect;
 
-    await db
-      .request()
-      .input("orderId", sql.UniqueIdentifier, orderId)
-      .input("providerId", sql.UniqueIdentifier, row.id)
-      .input("providerOrderId", sql.NVarChar, String(response.order))
-      .input("requestPayload", sql.NVarChar, JSON.stringify(requestPayload))
-      .input("responsePayload", sql.NVarChar, JSON.stringify(response))
-      .input("status", sql.NVarChar, "sent")
-      .query(`
-        INSERT INTO provider_orders (order_id, provider_id, provider_order_id, request_payload, response_payload, status)
-        VALUES (@orderId, @providerId, @providerOrderId, @requestPayload, @responsePayload, @status)
-      `);
+    // Fetch service provider details & user email
+    const [serviceResult, userResult] = await Promise.all([
+      db
+        .request()
+        .input("serviceId", sql.UniqueIdentifier, serviceId)
+        .query("SELECT name, provider_id, provider_service_id FROM services WHERE id = @serviceId"),
+      db
+        .request()
+        .input("userId", sql.UniqueIdentifier, userId)
+        .query("SELECT email FROM users WHERE id = @userId"),
+    ]);
 
-    await db
-      .request()
-      .input("orderId", sql.UniqueIdentifier, orderId)
-      .input("status", sql.NVarChar, "in_progress")
-      .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
-      .query("UPDATE orders SET status = @status, updated_at = @updatedAt WHERE id = @orderId");
+    const service = serviceResult.recordset[0];
+    const userEmail = userResult.recordset[0]?.email ?? "customer";
 
-    await db
-      .request()
-      .input("orderId", sql.UniqueIdentifier, orderId)
-      .input("fromStatus", sql.NVarChar, "pending")
-      .input("toStatus", sql.NVarChar, "in_progress")
-      .input("note", sql.NVarChar, "Forwarded to provider")
-      .query(`
-        INSERT INTO order_status_history (order_id, from_status, to_status, note)
-        VALUES (@orderId, @fromStatus, @toStatus, @note)
-      `);
-
-    // Dispatch Telegram Alert for New Order
-    void sendTelegramNewOrderAlert({
-      orderId,
-      userEmail,
-      serviceName: service.name,
-      quantity: input.quantity,
-      charge,
-      link: input.link,
-      providerStatus: "Forwarded to Provider (In Progress)",
-    });
-
-    return { orderId, status: "in_progress", charge };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Provider error";
-    const lower = message.toLowerCase();
-
-    const isLowBalanceOrTemporary =
-      lower.includes("not enough funds") ||
-      lower.includes("balance") ||
-      lower.includes("fund") ||
-      lower.includes("insufficient") ||
-      lower.includes("timed out") ||
-      lower.includes("network") ||
-      lower.includes("temporarily");
-
-    if (isLowBalanceOrTemporary) {
-      // Safely hold in Admin Queue without failing or refunding the customer
+    if (!service?.provider_service_id) {
       await db
         .request()
         .input("orderId", sql.UniqueIdentifier, orderId)
-        .input("providerId", sql.UniqueIdentifier, service.provider_id)
-        .input("requestPayload", sql.NVarChar, JSON.stringify(requestPayload))
-        .input("responsePayload", sql.NVarChar, JSON.stringify({ error: message, queued: true }))
-        .input("status", sql.NVarChar, "queued")
-        .query(`
-          INSERT INTO provider_orders (order_id, provider_id, request_payload, response_payload, status)
-          VALUES (@orderId, @providerId, @requestPayload, @responsePayload, @status)
-        `);
+        .input("reason", sql.NVarChar, "Service is not linked to a provider")
+        .execute("sp_refund_order");
+      return;
+    }
 
-      await db
-        .request()
-        .input("orderId", sql.UniqueIdentifier, orderId)
-        .input("status", sql.NVarChar, "pending")
-        .input("errorMessage", sql.NVarChar, "Held in Admin Queue (Provider balance low)")
-        .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
-        .query("UPDATE orders SET status = @status, error_message = @errorMessage, updated_at = @updatedAt WHERE id = @orderId");
+    const requestPayload = {
+      service: service.provider_service_id,
+      link,
+      quantity,
+    };
 
-      await db
-        .request()
-        .input("orderId", sql.UniqueIdentifier, orderId)
-        .input("fromStatus", sql.NVarChar, "pending")
-        .input("toStatus", sql.NVarChar, "pending")
-        .input("note", sql.NVarChar, `Queued for admin: ${message}`)
-        .query(`
-          INSERT INTO order_status_history (order_id, from_status, to_status, note)
-          VALUES (@orderId, @fromStatus, @toStatus, @note)
-        `);
+    try {
+      const { row, client } = await getProviderClient(service.provider_id);
+      const response = await client.createOrder(requestPayload);
+      await markProviderHealth(row.id, null);
 
-      // Dispatch Telegram Alert to Admin
-      void sendTelegramLowBalanceAlert({
+      // Parallelize DB updates
+      await Promise.all([
+        db
+          .request()
+          .input("orderId", sql.UniqueIdentifier, orderId)
+          .input("providerId", sql.UniqueIdentifier, row.id)
+          .input("providerOrderId", sql.NVarChar, String(response.order))
+          .input("requestPayload", sql.NVarChar, JSON.stringify(requestPayload))
+          .input("responsePayload", sql.NVarChar, JSON.stringify(response))
+          .input("status", sql.NVarChar, "sent")
+          .query(`
+            INSERT INTO provider_orders (order_id, provider_id, provider_order_id, request_payload, response_payload, status)
+            VALUES (@orderId, @providerId, @providerOrderId, @requestPayload, @responsePayload, @status)
+          `),
+        db
+          .request()
+          .input("orderId", sql.UniqueIdentifier, orderId)
+          .input("status", sql.NVarChar, "in_progress")
+          .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
+          .query("UPDATE orders SET status = @status, updated_at = @updatedAt WHERE id = @orderId"),
+        db
+          .request()
+          .input("orderId", sql.UniqueIdentifier, orderId)
+          .input("fromStatus", sql.NVarChar, "pending")
+          .input("toStatus", sql.NVarChar, "in_progress")
+          .input("note", sql.NVarChar, "Forwarded to provider")
+          .query(`
+            INSERT INTO order_status_history (order_id, from_status, to_status, note)
+            VALUES (@orderId, @fromStatus, @toStatus, @note)
+          `),
+      ]);
+
+      // Dispatch Telegram Alert for New Order
+      void sendTelegramNewOrderAlert({
         orderId,
         userEmail,
         serviceName: service.name,
-        quantity: input.quantity,
+        quantity,
         charge,
-        link: input.link,
-        reason: message,
+        link,
+        providerStatus: "Forwarded to Provider (In Progress)",
       });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Provider error";
+      const lower = message.toLowerCase();
 
-      return { orderId, status: "pending", charge, isQueued: true };
+      const isLowBalanceOrTemporary =
+        lower.includes("not enough funds") ||
+        lower.includes("balance") ||
+        lower.includes("fund") ||
+        lower.includes("insufficient") ||
+        lower.includes("timed out") ||
+        lower.includes("network") ||
+        lower.includes("temporarily");
+
+      if (isLowBalanceOrTemporary) {
+        // Safely hold in Admin Queue without failing or refunding the customer
+        await Promise.all([
+          db
+            .request()
+            .input("orderId", sql.UniqueIdentifier, orderId)
+            .input("providerId", sql.UniqueIdentifier, service.provider_id)
+            .input("requestPayload", sql.NVarChar, JSON.stringify(requestPayload))
+            .input("responsePayload", sql.NVarChar, JSON.stringify({ error: message, queued: true }))
+            .input("status", sql.NVarChar, "queued")
+            .query(`
+              INSERT INTO provider_orders (order_id, provider_id, request_payload, response_payload, status)
+              VALUES (@orderId, @providerId, @requestPayload, @responsePayload, @status)
+            `),
+          db
+            .request()
+            .input("orderId", sql.UniqueIdentifier, orderId)
+            .input("status", sql.NVarChar, "pending")
+            .input("errorMessage", sql.NVarChar, "Held in Admin Queue (Provider balance low)")
+            .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
+            .query("UPDATE orders SET status = @status, error_message = @errorMessage, updated_at = @updatedAt WHERE id = @orderId"),
+          db
+            .request()
+            .input("orderId", sql.UniqueIdentifier, orderId)
+            .input("fromStatus", sql.NVarChar, "pending")
+            .input("toStatus", sql.NVarChar, "pending")
+            .input("note", sql.NVarChar, `Queued for admin: ${message}`)
+            .query(`
+              INSERT INTO order_status_history (order_id, from_status, to_status, note)
+              VALUES (@orderId, @fromStatus, @toStatus, @note)
+            `),
+        ]);
+
+        // Dispatch Telegram Alert to Admin
+        void sendTelegramLowBalanceAlert({
+          orderId,
+          userEmail,
+          serviceName: service.name,
+          quantity,
+          charge,
+          link,
+          reason: message,
+        });
+
+        return;
+      }
+
+      // Fatal error -> refund
+      await Promise.all([
+        db
+          .request()
+          .input("orderId", sql.UniqueIdentifier, orderId)
+          .input("providerId", sql.UniqueIdentifier, service.provider_id)
+          .input("requestPayload", sql.NVarChar, JSON.stringify(requestPayload))
+          .input("responsePayload", sql.NVarChar, JSON.stringify({ error: message }))
+          .input("status", sql.NVarChar, "failed")
+          .query(`
+            INSERT INTO provider_orders (order_id, provider_id, request_payload, response_payload, status)
+            VALUES (@orderId, @providerId, @requestPayload, @responsePayload, @status)
+          `),
+        db
+          .request()
+          .input("orderId", sql.UniqueIdentifier, orderId)
+          .input("status", sql.NVarChar, "failed")
+          .input("errorMessage", sql.NVarChar, message)
+          .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
+          .query("UPDATE orders SET status = @status, error_message = @errorMessage, updated_at = @updatedAt WHERE id = @orderId"),
+      ]);
+
+      await db
+        .request()
+        .input("orderId", sql.UniqueIdentifier, orderId)
+        .input("reason", sql.NVarChar, "Order could not be placed, amount refunded")
+        .execute("sp_refund_order");
+
+      // Dispatch Telegram Alert for Failed / Refunded Order
+      void sendTelegramOrderFailedAlert({
+        orderId,
+        userEmail,
+        serviceName: service.name,
+        reason: message,
+        charge,
+      });
     }
-
-    // Fatal error -> refund
-    await db
-      .request()
-      .input("orderId", sql.UniqueIdentifier, orderId)
-      .input("providerId", sql.UniqueIdentifier, service.provider_id)
-      .input("requestPayload", sql.NVarChar, JSON.stringify(requestPayload))
-      .input("responsePayload", sql.NVarChar, JSON.stringify({ error: message }))
-      .input("status", sql.NVarChar, "failed")
-      .query(`
-        INSERT INTO provider_orders (order_id, provider_id, request_payload, response_payload, status)
-        VALUES (@orderId, @providerId, @requestPayload, @responsePayload, @status)
-      `);
-
-    await db
-      .request()
-      .input("orderId", sql.UniqueIdentifier, orderId)
-      .input("status", sql.NVarChar, "failed")
-      .input("errorMessage", sql.NVarChar, message)
-      .input("updatedAt", sql.DateTimeOffset, new Date().toISOString())
-      .query("UPDATE orders SET status = @status, error_message = @errorMessage, updated_at = @updatedAt WHERE id = @orderId");
-
-    await db
-      .request()
-      .input("orderId", sql.UniqueIdentifier, orderId)
-      .input("reason", sql.NVarChar, "Order could not be placed, amount refunded")
-      .execute("sp_refund_order");
-
-    // Dispatch Telegram Alert for Failed / Refunded Order
-    void sendTelegramOrderFailedAlert({
-      orderId,
-      userEmail,
-      serviceName: service.name,
-      reason: message,
-      charge,
-    });
-
-    throw new Error("We could not place this order right now. Your wallet has been refunded.");
+  } catch (err) {
+    console.error(`[forwardOrderToProvider] Background processing error for order ${orderId}:`, err);
   }
 }
 

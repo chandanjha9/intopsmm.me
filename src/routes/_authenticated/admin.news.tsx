@@ -49,6 +49,13 @@ export const Route = createFileRoute("/_authenticated/admin/news")({
       { name: "robots", content: "noindex" },
     ],
   }),
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData({
+      queryKey: ["admin-announcements"],
+      queryFn: () => listAnnouncementsAdmin(),
+      staleTime: 30 * 1000,
+    });
+  },
   component: AdminNewsPage,
 });
 
@@ -63,6 +70,8 @@ function AdminNewsPage() {
   const { data: announcements = [], isLoading } = useQuery({
     queryKey: ["admin-announcements"],
     queryFn: () => fetchList(),
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 
   const [search, setSearch] = useState("");
@@ -78,6 +87,8 @@ function AdminNewsPage() {
   const [badge, setBadge] = useState("");
   const [isPopup, setIsPopup] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  // Duration: offset hours from now, 0 = never expires
+  const [durationHours, setDurationHours] = useState(0);
 
   const resetForm = () => {
     setTitle("");
@@ -87,6 +98,7 @@ function AdminNewsPage() {
     setBadge("");
     setIsPopup(false);
     setIsActive(true);
+    setDurationHours(0);
     setEditingItem(null);
   };
 
@@ -104,12 +116,23 @@ function AdminNewsPage() {
     setBadge(item.badge || "");
     setIsPopup(item.is_popup);
     setIsActive(item.is_active);
+    // Reconstruct duration from expires_at if it exists
+    if (item.expires_at) {
+      const diff = Math.round((new Date(item.expires_at).getTime() - Date.now()) / (1000 * 3600));
+      setDurationHours(diff > 0 ? diff : 0);
+    } else {
+      setDurationHours(0);
+    }
     setIsCreateOpen(true);
   };
 
   // Create / Update Mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const expiresAt = durationHours > 0
+        ? new Date(Date.now() + durationHours * 3600 * 1000).toISOString()
+        : null;
+
       if (editingItem) {
         return await updateFn({
           data: {
@@ -121,6 +144,7 @@ function AdminNewsPage() {
             badge: badge.trim() || undefined,
             is_popup: isPopup,
             is_active: isActive,
+            expires_at: expiresAt,
           },
         });
       } else {
@@ -133,6 +157,7 @@ function AdminNewsPage() {
             badge: badge.trim() || undefined,
             is_popup: isPopup,
             is_active: isActive,
+            expires_at: expiresAt,
           },
         });
       }
@@ -316,6 +341,21 @@ function AdminNewsPage() {
                           year: "numeric",
                         })}
                       </span>
+
+                      {/* Expiry indicator */}
+                      {item.expires_at ? (
+                        new Date(item.expires_at) > new Date() ? (
+                          <span className="flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                            ⏱ Expires {new Date(item.expires_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-600">
+                            ❌ Expired
+                          </span>
+                        )
+                      ) : (
+                        <span className="rounded-full border border-muted/40 px-2 py-0.5 text-xs text-muted-foreground">♾ Never Expires</span>
+                      )}
                     </div>
 
                     <h3 className="text-base font-bold text-foreground">{item.title}</h3>
@@ -468,6 +508,28 @@ function AdminNewsPage() {
                   <p className="text-xs text-muted-foreground">Make this post immediately visible to users.</p>
                 </div>
                 <Switch checked={isActive} onCheckedChange={setIsActive} />
+              </div>
+
+              {/* Auto-Expire Duration */}
+              <div className="space-y-1.5">
+                <Label htmlFor="post-duration">⏱ Auto-Expire After</Label>
+                <select
+                  id="post-duration"
+                  value={durationHours}
+                  onChange={(e) => setDurationHours(Number(e.target.value))}
+                  className="h-10 w-full rounded-md border border-input bg-background/80 px-3 py-2 text-sm shadow-sm"
+                >
+                  <option value={0}>♾ Never (always active until manually disabled)</option>
+                  <option value={1}>1 Hour</option>
+                  <option value={6}>6 Hours</option>
+                  <option value={12}>12 Hours</option>
+                  <option value={24}>24 Hours (1 Day)</option>
+                  <option value={72}>3 Days</option>
+                  <option value={168}>7 Days</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  After this time, the post will automatically stop showing to users.
+                </p>
               </div>
             </div>
 

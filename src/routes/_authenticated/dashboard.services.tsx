@@ -254,7 +254,16 @@ function DashboardServicesPage() {
                             variant="hero"
                             size="sm"
                             className="h-8 px-3 text-xs gap-1"
-                            onClick={() => navigate({ to: "/dashboard" })}
+                            onClick={() =>
+                              navigate({
+                                to: "/dashboard",
+                                search: {
+                                  serviceId: service.id,
+                                  serviceName: service.name,
+                                  category: service.category,
+                                },
+                              })
+                            }
                           >
                             Order <ArrowRight className="h-3 w-3" />
                           </Button>

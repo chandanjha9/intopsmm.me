@@ -329,7 +329,15 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   };
 }
 
+const userRoleCache = new Map<string, { hasRole: boolean; expiresAt: number }>();
+
 export async function checkUserRole(userId: string, role: string): Promise<boolean> {
+  const cacheKey = `${userId}:${role}`;
+  const cached = userRoleCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.hasRole;
+  }
+
   const db = await poolConnect;
   const result = await db
     .request()
@@ -337,7 +345,9 @@ export async function checkUserRole(userId: string, role: string): Promise<boole
     .input("role", sql.NVarChar, role)
     .query("SELECT 1 FROM user_roles WHERE user_id = @userId AND role = @role");
 
-  return result.recordset.length > 0;
+  const hasRole = result.recordset.length > 0;
+  userRoleCache.set(cacheKey, { hasRole, expiresAt: Date.now() + 60_000 });
+  return hasRole;
 }
 
 // ── Forgot Password ──────────────────────────────────────────────────────────

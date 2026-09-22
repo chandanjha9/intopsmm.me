@@ -124,8 +124,7 @@ function Landing() {
   return (
     <div className="min-h-screen bg-page-tint text-foreground animate-in fade-in duration-300">
       <Nav />
-      <PromoPopup />
-      <PromoSticker />
+
       <Hero />
       <ServicesDirectory />
       <TagStrip />
@@ -140,100 +139,6 @@ function Landing() {
   );
 }
 
-/* ---------------- PROMO POPUP & STICKER ---------------- */
-const PROMO_SEEN_KEY = "promo_popup_last_shown";
-const PROMO_GAP_MS = 60 * 60 * 1000; // show again only after 1 hour
-
-function PromoPopup() {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    let last = 0;
-    try {
-      last = Number(window.localStorage.getItem(PROMO_SEEN_KEY) ?? 0);
-    } catch {
-      last = 0;
-    }
-    if (Date.now() - last < PROMO_GAP_MS) return;
-
-    const timer = setTimeout(() => {
-      setOpen(true);
-      try {
-        window.localStorage.setItem(PROMO_SEEN_KEY, String(Date.now()));
-      } catch {
-        /* storage blocked — popup just shows again next visit */
-      }
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, []);
-
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-md border-0 bg-[image:var(--gradient-primary)] p-0 text-primary-foreground sm:rounded-xl">
-        <div className="relative overflow-hidden p-6 pt-8 text-center sm:p-8">
-          <span className="absolute -right-6 -top-6 flex h-24 w-24 items-center justify-center rounded-full bg-white/20">
-            <Gift className="h-10 w-10 text-white" />
-          </span>
-          <DialogHeader>
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-xl bg-white text-primary shadow-lg">
-              <Percent className="h-7 w-7" />
-            </div>
-            <DialogTitle className="mt-5 text-2xl font-bold text-white">
-              30% OFF First Order!
-            </DialogTitle>
-            <DialogDescription className="text-white/85">
-              Welcome to Intopsmm. Place your first order today and get a flat 30% discount.
-              Limited time offer — don't miss out!
-            </DialogDescription>
-          </DialogHeader>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Button asChild variant="complementary" size="lg" className="font-bold">
-              <Link to="/register" onClick={() => setOpen(false)}>
-                Claim Offer <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button
-              variant="ghost"
-              size="lg"
-              onClick={() => setOpen(false)}
-              className="text-white hover:bg-white/15 hover:text-white"
-            >
-              Maybe later
-            </Button>
-          </div>
-          <p className="mt-4 text-xs text-white/70">*Auto-applied at checkout for new users.</p>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function PromoSticker() {
-  const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
-  return (
-    <div className="fixed bottom-4 right-4 z-40 hidden flex-col items-end gap-2 md:flex">
-      <div className="relative overflow-hidden rounded-xl bg-[image:var(--gradient-primary)] p-3 pl-4 pr-5 text-primary-foreground shadow-glow">
-        <button
-          onClick={() => setDismissed(true)}
-          className="absolute right-1 top-1 rounded p-0.5 text-white/70 transition hover:bg-white/20 hover:text-white"
-          aria-label="Close offer"
-        >
-          <X className="h-3 w-3" />
-        </button>
-        <div className="flex items-center gap-2 pr-4">
-          <Tag className="h-5 w-5" />
-          <div>
-            <p className="text-xs font-bold leading-tight">30% OFF</p>
-            <p className="text-xs leading-tight text-white/85">First Order</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ---------------- NAV ---------------- */
 export function Nav() {

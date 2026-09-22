@@ -28,7 +28,18 @@ import { formatInr } from "@/lib/providers/pricing";
 import { getTotalOrderCount, listMyOrders, listServices, placeOrder } from "@/lib/orders.functions";
 import { isCurrentUserAdmin } from "@/lib/providers/admin.functions";
 
+type DashboardSearch = {
+  serviceId?: string;
+  serviceName?: string;
+  category?: string;
+};
+
 export const Route = createFileRoute("/_authenticated/dashboard/")({
+  validateSearch: (search: Record<string, unknown>): DashboardSearch => ({
+    serviceId: typeof search.serviceId === "string" && search.serviceId.trim() ? search.serviceId.trim() : undefined,
+    serviceName: typeof search.serviceName === "string" && search.serviceName.trim() ? search.serviceName.trim() : undefined,
+    category: typeof search.category === "string" && search.category.trim() ? search.category.trim() : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "New Order — Intopsmm Dashboard" },
@@ -163,6 +174,7 @@ const getCustomDescription = (serviceName: string, defaultDesc: string | null) =
 };
 
 function DashboardPage() {
+  const searchParams = Route.useSearch();
   const { profile, user, refreshProfile } = useAuth();
   const queryClient = useQueryClient();
   const username = profile?.username ?? user?.email?.split("@")[0] ?? "member";
@@ -289,6 +301,53 @@ function DashboardPage() {
     setServiceId(item.id);
     setServiceSearch("");
   };
+
+  // Auto-filter and select service if passed via URL search parameters (from Daily Updates or Services page)
+  const autoSelectedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!allServices || allServices.length === 0) return;
+
+    const { serviceId: paramServiceId, serviceName: paramServiceName, category: paramCategory } = searchParams;
+    if (!paramServiceId && !paramServiceName && !paramCategory) return;
+
+    const paramKey = `${paramServiceId || ""}:${paramServiceName || ""}:${paramCategory || ""}`;
+    if (autoSelectedRef.current === paramKey) return;
+
+    // 1. Exact match by service ID
+    let match: Service | undefined;
+    if (paramServiceId) {
+      match = allServices.find((s) => s.id.toLowerCase() === paramServiceId.toLowerCase());
+    }
+
+    // 2. Match by exact service name or partial name
+    if (!match && paramServiceName) {
+      const q = paramServiceName.toLowerCase().trim();
+      match =
+        allServices.find((s) => s.name.toLowerCase() === q) ||
+        allServices.find((s) => s.name.toLowerCase().includes(q) || q.includes(s.name.toLowerCase()));
+    }
+
+    // 3. Match by category
+    if (!match && paramCategory) {
+      const q = paramCategory.toLowerCase().trim();
+      match =
+        allServices.find((s) => (s.category || "").toLowerCase() === q) ||
+        allServices.find((s) => (s.category || "").toLowerCase().includes(q) || q.includes((s.category || "").toLowerCase()));
+    }
+
+    if (match) {
+      autoSelectedRef.current = paramKey;
+      pickService(match);
+
+      setTimeout(() => {
+        const el = document.getElementById("order-composer");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
+    }
+  }, [allServices, searchParams]);
 
 
   // Calculate Net Spent: subtract any refunded, canceled or failed orders
@@ -419,7 +478,7 @@ function DashboardPage() {
           </section>
 
           {/* Order composer */}
-          <Card className="glass border-border/60 p-4 sm:p-6 shadow-card">
+          <Card id="order-composer" className="glass border-border/60 p-4 sm:p-6 shadow-card scroll-mt-6">
             <h2 className="text-lg font-bold">New Order</h2>
             <p className="text-sm text-muted-foreground">Choose a Platform</p>
 
@@ -530,7 +589,17 @@ function DashboardPage() {
                       return m ? m[1].trim() : "0 - 10 Minutes";
                     })()} />
                     <DescBadge Icon={Gauge} label="Quantity" value={`${service.min_quantity.toLocaleString("en-IN")} - ${service.max_quantity.toLocaleString("en-IN")}`} />
-                    <DescBadge Icon={ShieldCheck} label="Refill" value={service.refill_supported ? "Supported" : "Not Required"} />
+                    <DescBadge Icon={ShieldCheck} label="Refill" value={
+                      service.refill_supported ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                          ✓ Yes
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground">
+                          No
+                        </span>
+                      )
+                    } />
                   </div>
 
                   {/* Right Column: More About Service */}
@@ -569,12 +638,37 @@ function DashboardPage() {
                       inputMode="numeric"
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value.replace(/[^0-9]/g, ""))}
-                      className="h-12 rounded-xl border-border/60 bg-background text-base"
+                      className={`h-12 rounded-xl border-border/60 bg-background text-base ${
+                        quantity && qtyNum < (Number(service.min_quantity) || 1)
+                          ? "border-red-500/70 focus-visible:ring-red-500/40"
+                          : quantity && Number(service.max_quantity) > 0 && qtyNum > Number(service.max_quantity)
+                          ? "border-red-500/70 focus-visible:ring-red-500/40"
+                          : quantity && qtyNum >= (Number(service.min_quantity) || 1)
+                          ? "border-emerald-500/50 focus-visible:ring-emerald-500/30"
+                          : ""
+                      }`}
                     />
                     <p className="text-xs text-muted-foreground">
                       Min: {service.min_quantity.toLocaleString("en-IN")} — Max:{" "}
                       {service.max_quantity.toLocaleString("en-IN")}
                     </p>
+                    {/* Real-time quantity validation alert */}
+                    {quantity && qtyNum < (Number(service.min_quantity) || 1) && (
+                      <div className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-500">
+                        <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                        </svg>
+                        Minimum quantity is {Number(service.min_quantity).toLocaleString("en-IN")}. Please enter at least {Number(service.min_quantity).toLocaleString("en-IN")}.
+                      </div>
+                    )}
+                    {quantity && Number(service.max_quantity) > 0 && qtyNum > Number(service.max_quantity) && (
+                      <div className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-500">
+                        <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                        </svg>
+                        Maximum quantity is {Number(service.max_quantity).toLocaleString("en-IN")}. Please enter at most {Number(service.max_quantity).toLocaleString("en-IN")}.
+                      </div>
+                    )}
                   </Field>
                 </div>
 

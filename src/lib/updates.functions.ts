@@ -16,29 +16,27 @@ export type DailyUpdate = {
   badge: string;
 };
 
+// In-memory cache for daily updates (5-minute TTL for instant response)
+let dailyUpdatesCache: { data: DailyUpdate[]; expiresAt: number } | null = null;
+
 export const listDailyUpdates = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async (): Promise<DailyUpdate[]> => {
+    if (dailyUpdatesCache && dailyUpdatesCache.expiresAt > Date.now()) {
+      return dailyUpdatesCache.data;
+    }
+
     try {
       const db = await poolConnect;
-      // Fetch latest active services to compose accurate live daily updates
+      // Fast single-record fetch for latest active service
       const result = await db.request().query(`
-        SELECT TOP 30
-          id,
-          name,
-          category,
-          platform,
-          selling_rate,
-          min_quantity,
-          max_quantity,
-          refill_supported,
-          created_at
+        SELECT TOP 1 id, name
         FROM services
         WHERE is_active = 1
-        ORDER BY created_at DESC, id DESC
+        ORDER BY created_at DESC
       `);
 
-      const services = result.recordset;
+      const topService = result.recordset[0];
 
       // Curated timeline of daily updates combining live services + platform updates
       const now = new Date();
@@ -54,8 +52,8 @@ export const listDailyUpdates = createServerFn({ method: "GET" })
           title: "Instagram Real Indian Followers — Speed & Non-Drop Upgrade",
           type: "improvement",
           category: "Instagram - Followers",
-          serviceName: services[0]?.name || "Instagram Followers [High Quality / 30D Refill]",
-          serviceId: String(services[0]?.id || "1"),
+          serviceName: topService?.name || "Instagram Followers [High Quality / 30D Refill]",
+          serviceId: String(topService?.id || "1"),
           description: "Delivery speed upgraded to 100K/day. Non-drop algorithm improved with instant 0-5 mins start time.",
           badge: "⚡ Speed Upgraded",
         },
@@ -125,9 +123,10 @@ export const listDailyUpdates = createServerFn({ method: "GET" })
         },
       ];
 
+      dailyUpdatesCache = { data: updates, expiresAt: Date.now() + 5 * 60_000 };
       return updates;
     } catch (err) {
       console.error("listDailyUpdates error:", err);
-      return [];
+      return dailyUpdatesCache?.data ?? [];
     }
   });

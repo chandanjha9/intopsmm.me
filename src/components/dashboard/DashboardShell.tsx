@@ -114,6 +114,10 @@ export function DashboardShell({ active, children }: { active: string; children:
       void router.preloadRoute({ to: "/dashboard/order-history" });
       void router.preloadRoute({ to: "/dashboard/transactions" });
       void router.preloadRoute({ to: "/dashboard/services" });
+      void router.preloadRoute({ to: "/dashboard/updates" });
+      if (isAdmin) {
+        void router.preloadRoute({ to: "/admin/news" });
+      }
     });
 
     return () => {
@@ -121,7 +125,7 @@ export function DashboardShell({ active, children }: { active: string; children:
         (window as unknown as { cancelIdleCallback: (h: number) => void }).cancelIdleCallback(handle as number);
       }
     };
-  }, [router]);
+  }, [router, isAdmin]);
 
   const sidebarContent = (
     <div className="space-y-4">

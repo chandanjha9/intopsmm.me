@@ -16,6 +16,7 @@ export type Announcement = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  expires_at: string | null;
 };
 
 const createAnnouncementSchema = z.object({
@@ -26,6 +27,7 @@ const createAnnouncementSchema = z.object({
   badge: z.string().trim().optional(),
   is_popup: z.boolean().default(false),
   is_active: z.boolean().default(true),
+  expires_at: z.string().datetime().nullable().optional(),
 });
 
 const updateAnnouncementSchema = z.object({
@@ -37,6 +39,7 @@ const updateAnnouncementSchema = z.object({
   badge: z.string().trim().optional(),
   is_popup: z.boolean().default(false),
   is_active: z.boolean().default(true),
+  expires_at: z.string().datetime().nullable().optional(),
 });
 
 const toggleActiveSchema = z.object({
@@ -65,7 +68,8 @@ export const listAnnouncementsAdmin = createServerFn({ method: "GET" })
         is_popup,
         is_active,
         created_at,
-        updated_at
+        updated_at,
+        expires_at
       FROM announcements
       ORDER BY created_at DESC
     `);
@@ -77,8 +81,18 @@ export const listAnnouncementsAdmin = createServerFn({ method: "GET" })
       is_active: Boolean(row.is_active),
       created_at: new Date(row.created_at).toISOString(),
       updated_at: new Date(row.updated_at).toISOString(),
+      expires_at: row.expires_at ? new Date(row.expires_at).toISOString() : null,
     })) as Announcement[];
   });
+
+// In-memory cache for ultra-fast instant load of announcements and alerts
+let activeAnnouncementsCache: { data: Announcement[]; expiresAt: number } | null = null;
+let popupAlertsCache: { data: Announcement[]; expiresAt: number } | null = null;
+
+export function invalidateAnnouncementsCache() {
+  activeAnnouncementsCache = null;
+  popupAlertsCache = null;
+}
 
 /** Create a new Announcement or Alert */
 export const createAnnouncementAdmin = createServerFn({ method: "POST" })
@@ -87,6 +101,8 @@ export const createAnnouncementAdmin = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireAdmin(context.userId);
     const db = await poolConnect;
+
+    const expiresAt = data.expires_at ? new Date(data.expires_at) : null;
 
     const result = await db
       .request()
@@ -97,12 +113,14 @@ export const createAnnouncementAdmin = createServerFn({ method: "POST" })
       .input("badge", sql.NVarChar(100), data.badge || null)
       .input("is_popup", sql.Bit, data.is_popup ? 1 : 0)
       .input("is_active", sql.Bit, data.is_active ? 1 : 0)
+      .input("expires_at", sql.DateTimeOffset, expiresAt)
       .query(`
-        INSERT INTO announcements (title, description, category, post_type, badge, is_popup, is_active)
+        INSERT INTO announcements (title, description, category, post_type, badge, is_popup, is_active, expires_at)
         OUTPUT INSERTED.id
-        VALUES (@title, @description, @category, @post_type, @badge, @is_popup, @is_active)
+        VALUES (@title, @description, @category, @post_type, @badge, @is_popup, @is_active, @expires_at)
       `);
 
+    invalidateAnnouncementsCache();
     return { success: true, id: String(result.recordset[0].id) };
   });
 
@@ -114,6 +132,8 @@ export const updateAnnouncementAdmin = createServerFn({ method: "POST" })
     await requireAdmin(context.userId);
     const db = await poolConnect;
 
+    const expiresAt = data.expires_at ? new Date(data.expires_at) : null;
+
     await db
       .request()
       .input("id", sql.UniqueIdentifier, data.id)
@@ -124,6 +144,7 @@ export const updateAnnouncementAdmin = createServerFn({ method: "POST" })
       .input("badge", sql.NVarChar(100), data.badge || null)
       .input("is_popup", sql.Bit, data.is_popup ? 1 : 0)
       .input("is_active", sql.Bit, data.is_active ? 1 : 0)
+      .input("expires_at", sql.DateTimeOffset, expiresAt)
       .query(`
         UPDATE announcements
         SET 
@@ -134,10 +155,12 @@ export const updateAnnouncementAdmin = createServerFn({ method: "POST" })
           badge = @badge,
           is_popup = @is_popup,
           is_active = @is_active,
+          expires_at = @expires_at,
           updated_at = SYSDATETIMEOFFSET()
         WHERE id = @id
       `);
 
+    invalidateAnnouncementsCache();
     return { success: true };
   });
 
@@ -159,6 +182,7 @@ export const toggleAnnouncementActiveAdmin = createServerFn({ method: "POST" })
         WHERE id = @id
       `);
 
+    invalidateAnnouncementsCache();
     return { success: true };
   });
 
@@ -175,6 +199,7 @@ export const deleteAnnouncementAdmin = createServerFn({ method: "POST" })
       .input("id", sql.UniqueIdentifier, data.id)
       .query(`DELETE FROM announcements WHERE id = @id`);
 
+    invalidateAnnouncementsCache();
     return { success: true };
   });
 
@@ -182,6 +207,10 @@ export const deleteAnnouncementAdmin = createServerFn({ method: "POST" })
 export const getUserActiveAnnouncements = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async () => {
+    if (activeAnnouncementsCache && activeAnnouncementsCache.expiresAt > Date.now()) {
+      return activeAnnouncementsCache.data;
+    }
+
     try {
       const db = await poolConnect;
       const result = await db.request().query(`
@@ -194,22 +223,28 @@ export const getUserActiveAnnouncements = createServerFn({ method: "GET" })
           badge,
           is_popup,
           is_active,
-          created_at
+          created_at,
+          expires_at
         FROM announcements
         WHERE is_active = 1
+          AND (expires_at IS NULL OR expires_at > SYSDATETIMEOFFSET())
         ORDER BY created_at DESC
       `);
 
-      return result.recordset.map((row) => ({
+      const data = result.recordset.map((row) => ({
         ...row,
         id: String(row.id),
         is_popup: Boolean(row.is_popup),
         is_active: Boolean(row.is_active),
         created_at: new Date(row.created_at).toISOString(),
+        expires_at: row.expires_at ? new Date(row.expires_at).toISOString() : null,
       })) as Announcement[];
+
+      activeAnnouncementsCache = { data, expiresAt: Date.now() + 60_000 };
+      return data;
     } catch (err) {
       console.error("getUserActiveAnnouncements error:", err);
-      return [];
+      return activeAnnouncementsCache?.data ?? [];
     }
   });
 
@@ -217,6 +252,10 @@ export const getUserActiveAnnouncements = createServerFn({ method: "GET" })
 export const getUserPopupAlerts = createServerFn({ method: "GET" })
   .middleware([requireAuth])
   .handler(async () => {
+    if (popupAlertsCache && popupAlertsCache.expiresAt > Date.now()) {
+      return popupAlertsCache.data;
+    }
+
     try {
       const db = await poolConnect;
       const result = await db.request().query(`
@@ -228,20 +267,26 @@ export const getUserPopupAlerts = createServerFn({ method: "GET" })
           post_type,
           badge,
           is_popup,
-          created_at
+          created_at,
+          expires_at
         FROM announcements
         WHERE is_active = 1 AND is_popup = 1
+          AND (expires_at IS NULL OR expires_at > SYSDATETIMEOFFSET())
         ORDER BY created_at DESC
       `);
 
-      return result.recordset.map((row) => ({
+      const data = result.recordset.map((row) => ({
         ...row,
         id: String(row.id),
         is_popup: Boolean(row.is_popup),
         created_at: new Date(row.created_at).toISOString(),
+        expires_at: row.expires_at ? new Date(row.expires_at).toISOString() : null,
       })) as Announcement[];
+
+      popupAlertsCache = { data, expiresAt: Date.now() + 60_000 };
+      return data;
     } catch (err) {
       console.error("getUserPopupAlerts error:", err);
-      return [];
+      return popupAlertsCache?.data ?? [];
     }
   });
